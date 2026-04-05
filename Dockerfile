@@ -26,8 +26,8 @@ RUN pip3 install --upgrade pip wheel setuptools
 # Copy requirements first (for better caching)
 COPY requirements.txt ./
 
-# Install dependencies
-RUN pip3 install --timeout=600 -r requirements.txt
+# Install dependencies with PyTorch CUDA 12.1 index
+RUN pip3 install --timeout=600 --extra-index-url https://download.pytorch.org/whl/cu121 -r requirements.txt
 
 # Copy setup.py and install package
 COPY setup.py ./

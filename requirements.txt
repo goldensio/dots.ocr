@@ -7,11 +7,11 @@ qwen_vl_utils
 transformers==4.57.6
 huggingface_hub
 modelscope
-torch
-torchvision
 # flash-attn==2.8.0.post2  # to speed up inference need flash-attn
 accelerate
 cairosvg
+torch
+torchvision
 
 # RunPod Serverless
 runpod
