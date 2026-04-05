@@ -6,7 +6,7 @@
   "iconUrl": "https://raw.githubusercontent.com/runpod/assets/main/logo/runpod-logo-black.png",
   "config": {
     "runsOn": "GPU",
-    "containerDiskInGb": 30,
+    "containerDiskInGb": 50,
     "presets": [
       {
         "name": "Standard OCR",
@@ -37,7 +37,7 @@
       },
       {
         "key": "MODEL_NAME",
-        "value": "rednote-hilab/dots.mocr"
+        "value": "/model"
       },
       {
         "key": "TEMPERATURE",

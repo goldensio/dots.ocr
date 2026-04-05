@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2 \
     wget \
     software-properties-common \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -22,7 +23,7 @@ WORKDIR /app
 # Upgrade pip
 RUN pip3 install --upgrade pip wheel setuptools
 
-# Copy requirements
+# Copy requirements first (for better caching)
 COPY requirements.txt ./
 
 # Install dependencies
@@ -32,18 +33,25 @@ RUN pip3 install --timeout=600 -r requirements.txt
 COPY setup.py ./
 RUN pip3 install --no-deps -e .
 
-# Copy application code
-COPY dots_mocr/ ./dots_mocr/
+# Copy tools for model download
 COPY tools/ ./tools/
+COPY dots_mocr/ ./dots_mocr/
+
+# Download model weights (this will cache in the layer)
+RUN python3 tools/download_model.py && \
+    mv weights/DotsMOCR /model && \
+    rm -rf weights
+
+# Copy handler and application code
 COPY handler.py .
 
 # Create output directory
 RUN mkdir -p /app/output
 
-# Set environment variables for HuggingFace mode
+# Set environment variables for HuggingFace mode with local model
 ENV PYTHONUNBUFFERED=1
 ENV USE_HF=true
-ENV MODEL_NAME=rednote-hilab/dots.mocr
+ENV MODEL_NAME=/model
 ENV TEMPERATURE=0.1
 ENV TOP_P=1.0
 ENV MAX_COMPLETION_TOKENS=32768

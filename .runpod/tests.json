@@ -29,7 +29,7 @@
       },
       {
         "key": "MODEL_NAME",
-        "value": "rednote-hilab/dots.mocr"
+        "value": "/model"
       },
       {
         "key": "TEMPERATURE",

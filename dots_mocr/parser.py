@@ -72,7 +72,10 @@ class DotsMOCRParser:
         except ImportError:
             attn_impl = None
 
-        model_path = "./weights/DotsMOCR"
+        # Use self.model_name for HuggingFace model loading
+        # Can be HuggingFace model ID (e.g., "rednote-hilab/dots.mocr")
+        # or local path (e.g., "./weights/DotsMOCR")
+        model_path = self.model_name
         self.model = AutoModelForCausalLM.from_pretrained(
             model_path,
             attn_implementation=attn_impl,
