@@ -33,14 +33,17 @@ RUN pip3 install --timeout=600 -r requirements.txt
 COPY setup.py ./
 RUN pip3 install --no-deps -e .
 
-# Copy tools for model download
+# Copy tools for model download and model code
 COPY tools/ ./tools/
 COPY dots_mocr/ ./dots_mocr/
 
-# Download model weights (this will cache in the layer)
+# Download model weights
 RUN python3 tools/download_model.py && \
     mv weights/DotsMOCR /model && \
     rm -rf weights
+
+# Apply flash_attn fix to make it optional
+RUN python3 tools/fix_flash_attn.py /model/modeling_dots_vision.py
 
 # Copy handler and application code
 COPY handler.py .
