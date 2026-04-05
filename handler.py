@@ -8,6 +8,8 @@ import base64
 from typing import Optional
 from PIL import Image
 
+import runpod  # Required
+
 from dots_mocr.parser import DotsMOCRParser
 from dots_mocr.utils.consts import image_extensions
 
@@ -60,20 +62,20 @@ def handler(event):
         }
     }
     """
+    # Extract input data from the request
+    input_data = event.get("input", {})
+    file_base64 = input_data.get("file_base64")
+    filename = input_data.get("filename", "document.pdf")
+    prompt_mode = input_data.get("prompt_mode", "prompt_ocr")
+
+    if not file_base64:
+        return {
+            "error": "No file provided. Please include 'file_base64' in input."
+        }
+
     try:
         # Initialize parser
         dots_parser = get_parser()
-
-        # Get input
-        input_data = event.get("input", {})
-        file_base64 = input_data.get("file_base64")
-        filename = input_data.get("filename", "document.pdf")
-        prompt_mode = input_data.get("prompt_mode", "prompt_ocr")
-
-        if not file_base64:
-            return {
-                "error": "No file provided. Please include 'file_base64' in input."
-            }
 
         # Decode base64 file
         if "," in file_base64:
@@ -110,6 +112,7 @@ def handler(event):
 
                 os.unlink(tmp_file_path)
 
+                # Return the result
                 return {
                     "status": "success",
                     "filename": filename,
@@ -148,6 +151,7 @@ def handler(event):
 
                         os.unlink(tmp_file_path)
 
+                        # Return the result
                         return {
                             "status": "success",
                             "filename": filename,
@@ -175,22 +179,6 @@ def handler(event):
         }
 
 
-# For local testing
+# Required - Start the RunPod serverless worker
 if __name__ == "__main__":
-    # Test handler
-    import json
-
-    # Read test file
-    with open("test_image.png", "rb") as f:
-        file_data = base64.b64encode(f.read()).decode()
-
-    test_event = {
-        "input": {
-            "file_base64": file_data,
-            "filename": "test_image.png",
-            "prompt_mode": "prompt_ocr"
-        }
-    }
-
-    result = handler(test_event)
-    print(json.dumps(result, indent=2))
+    runpod.serverless.start({"handler": handler})

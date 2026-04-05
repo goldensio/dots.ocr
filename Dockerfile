@@ -48,8 +48,8 @@ ENV MAX_COMPLETION_TOKENS=32768
 ENV DPI=200
 ENV OUTPUT_DIR=/app/output
 
-# Set the handler for RunPod
+# Set the handler for RunPod Serverless
 ENV HANDLER=handler
 
-# Default command (RunPod will override this)
+# Start the RunPod serverless worker
 CMD ["python3", "-u", "handler.py"]
