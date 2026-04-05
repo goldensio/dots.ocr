@@ -10,8 +10,11 @@ modelscope
 # flash-attn==2.8.0.post2  # to speed up inference need flash-attn
 accelerate
 cairosvg
-torch
-torchvision
+
+# PyTorch with CUDA 11.8 support
+# Pin to version 2.1.x for stable CUDA 11.8 builds
+torch==2.1.2
+torchvision==0.16.2
 
 # RunPod Serverless
 runpod
