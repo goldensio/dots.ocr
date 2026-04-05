@@ -4,13 +4,14 @@
 dots.mocr
 </h1>
 
+[![Runpod](https://api.runpod.io/badge/ahmednaeem5575/dots.mocr)](https://console.runpod.io/hub/ahmednaeem5575/dots.mocr)
 
 
 <div align="left">
-  <a href="https://dotsocr.xiaohongshu.com" target="_blank" rel="noopener noreferrer"><strong>🖥️ Live Demo</strong></a> | 
-  <a href="https://arxiv.org/abs/2603.13032v1" target="_blank" rel="noopener noreferrer"><strong>📄 arXiv</strong></a> | 
-  <a href="assets/wechat.jpg" target="_blank" rel="noopener noreferrer"><strong>💬 WeChat</strong></a> | 
-  <a href="https://www.xiaohongshu.com/user/profile/683ffe42000000001d021a4c" target="_blank" rel="noopener noreferrer"><strong>📕 rednote</strong></a> | 
+  <a href="https://dotsocr.xiaohongshu.com" target="_blank" rel="noopener noreferrer"><strong>🖥️ Live Demo</strong></a> |
+  <a href="https://arxiv.org/abs/2603.13032v1" target="_blank" rel="noopener noreferrer"><strong>📄 arXiv</strong></a> |
+  <a href="assets/wechat.jpg" target="_blank" rel="noopener noreferrer"><strong>💬 WeChat</strong></a> |
+  <a href="https://www.xiaohongshu.com/user/profile/683ffe42000000001d021a4c" target="_blank" rel="noopener noreferrer"><strong>📕 rednote</strong></a> |
   <a href="https://x.com/rednotehilab" target="_blank" rel="noopener noreferrer"><strong>🐦 X</strong></a>
 </div>
 

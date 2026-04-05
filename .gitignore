@@ -170,7 +170,6 @@ core.*
 data_cache
 
 model_ckpt/*
-.*/
 *.pickle
 latest_checkpointed_iteration.txt
 *yunkai/*
@@ -197,4 +196,7 @@ playground/
 outputs
 dummy.*
 
-weights/
+
+# RunPod Serverless - Keep .runpod directory for Hub configuration
+!.runpod/
+

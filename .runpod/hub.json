@@ -1,0 +1,92 @@
+{
+  "title": "Dots.MOCR - Advanced OCR with Markdown",
+  "description": "State-of-the-art OCR service that converts documents (PDF, images) into formatted Markdown. Supports multiple languages, tables, formulas, and complex layouts using the Dots.MOCR model.",
+  "type": "serverless",
+  "category": "image",
+  "iconUrl": "https://raw.githubusercontent.com/runpod/assets/main/logo/runpod-logo-black.png",
+  "config": {
+    "runsOn": "GPU",
+    "containerDiskInGb": 30,
+    "presets": [
+      {
+        "name": "Standard OCR",
+        "defaults": {
+          "PROMPT_MODE": "prompt_ocr",
+          "TEMPERATURE": "0.1"
+        }
+      },
+      {
+        "name": "Layout Analysis",
+        "defaults": {
+          "PROMPT_MODE": "prompt_layout_all_en",
+          "TEMPERATURE": "0.1"
+        }
+      },
+      {
+        "name": "General QA",
+        "defaults": {
+          "PROMPT_MODE": "prompt_general",
+          "TEMPERATURE": "0.1"
+        }
+      }
+    ],
+    "env": [
+      {
+        "key": "USE_HF",
+        "value": "true"
+      },
+      {
+        "key": "MODEL_NAME",
+        "value": "rednote-hilab/dots.mocr"
+      },
+      {
+        "key": "TEMPERATURE",
+        "input": {
+          "name": "Temperature",
+          "type": "float",
+          "description": "Sampling temperature (0.0 - 1.0). Lower = more deterministic",
+          "default": "0.1",
+          "min": 0.0,
+          "max": 1.0
+        }
+      },
+      {
+        "key": "TOP_P",
+        "input": {
+          "name": "Top P",
+          "type": "float",
+          "description": "Nucleus sampling parameter (0.0 - 1.0)",
+          "default": "1.0",
+          "min": 0.0,
+          "max": 1.0
+        }
+      },
+      {
+        "key": "MAX_COMPLETION_TOKENS",
+        "input": {
+          "name": "Max Tokens",
+          "type": "number",
+          "description": "Maximum tokens in the output",
+          "default": "32768",
+          "min": 1024,
+          "max": 65536
+        }
+      },
+      {
+        "key": "PROMPT_MODE",
+        "input": {
+          "name": "Prompt Mode",
+          "type": "select",
+          "description": "OCR processing mode",
+          "default": "prompt_ocr",
+          "options": [
+            {"value": "prompt_ocr", "label": "Standard OCR"},
+            {"value": "prompt_layout_all_en", "label": "Layout Analysis"},
+            {"value": "prompt_general", "label": "General QA"},
+            {"value": "prompt_scene_spotting", "label": "Scene Text"}
+          ]
+        }
+      }
+    ]
+  }
+}
