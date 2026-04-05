@@ -11,6 +11,9 @@ modelscope
 accelerate
 cairosvg
 
+# NumPy 1.x for PyTorch 2.1.2 compatibility (NumPy 2.x has breaking changes)
+numpy<2.0.0
+
 # PyTorch with CUDA 11.8 support
 # Pin to version 2.1.x for stable CUDA 11.8 builds
 torch==2.1.2
