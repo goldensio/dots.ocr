@@ -5,7 +5,6 @@ from multiprocessing.pool import ThreadPool, Pool
 import argparse
 from PIL import Image
 
-
 from dots_mocr.model.inference import inference_with_vllm
 from dots_mocr.utils.consts import image_extensions, MIN_PIXELS, MAX_PIXELS
 from dots_mocr.utils.image_utils import get_image_by_fitz_doc, fetch_image, smart_resize
