@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """
-Fix flash_attn import in modeling_dots_vision.py to make it optional.
-This script is run after downloading model weights to make flash_attn truly optional.
+Fix flash_attn import and model config after downloading model weights.
+This script is run after downloading model weights to make flash_attn truly optional
+and fix dtype compatibility issues.
 """
 import re
 import sys
+import json
 
 def fix_flash_attn_import(file_path):
     """Make flash_attn import optional in the model file."""
@@ -46,19 +48,57 @@ except ImportError:
         print(f"✗ Error fixing {file_path}: {e}", file=sys.stderr)
         return False
 
+def fix_model_config(config_path):
+    """Fix torch_dtype in model config.json to use float16 instead of bfloat16."""
+    try:
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+
+        original_dtype = config.get("torch_dtype")
+        print(f"Original torch_dtype in config: {original_dtype}")
+
+        # Change bfloat16 to float16 for better compatibility
+        if config.get("torch_dtype") == "bfloat16":
+            config["torch_dtype"] = "float16"
+            print("✓ Changed torch_dtype from bfloat16 to float16")
+        else:
+            print(f"✓ torch_dtype is {config.get('torch_dtype')}, no change needed")
+
+        # Write the fixed config
+        with open(config_path, 'w') as f:
+            json.dump(config, f, indent=2, ensure_ascii=False)
+
+        print(f"✓ Successfully fixed {config_path}")
+        return True
+
+    except Exception as e:
+        print(f"✗ Error fixing {config_path}: {e}", file=sys.stderr)
+        return False
+
 if __name__ == "__main__":
     import os
 
-    # Default path
     model_file = "/model/modeling_dots_vision.py"
+    config_file = "/model/config.json"
 
-    # Allow passing a different path as argument
+    # Allow passing different paths as arguments
     if len(sys.argv) > 1:
         model_file = sys.argv[1]
+    if len(sys.argv) > 2:
+        config_file = sys.argv[2]
 
-    if not os.path.exists(model_file):
-        print(f"✗ File not found: {model_file}", file=sys.stderr)
-        sys.exit(1)
+    success = True
 
-    success = fix_flash_attn_import(model_file)
+    # Fix modeling file
+    if os.path.exists(model_file):
+        success &= fix_flash_attn_import(model_file)
+    else:
+        print(f"⚠ Model file not found: {model_file}")
+
+    # Fix config file
+    if os.path.exists(config_file):
+        success &= fix_model_config(config_file)
+    else:
+        print(f"⚠ Config file not found: {config_file}")
+
     sys.exit(0 if success else 1)
