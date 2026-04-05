@@ -1,5 +1,6 @@
 # Dockerfile for RunPod Serverless - dots.mocr OCR
-FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
+# Use CUDA 11.8 for better driver compatibility
+FROM nvidia/cuda:11.8.0-devel-ubuntu22.04
 
 # Install Python and system dependencies
 # Ubuntu 22.04 has Python 3.10, not 3.12
@@ -26,8 +27,8 @@ RUN pip3 install --upgrade pip wheel setuptools
 # Copy requirements first (for better caching)
 COPY requirements.txt ./
 
-# Install dependencies with PyTorch CUDA 12.1 index
-RUN pip3 install --timeout=600 --extra-index-url https://download.pytorch.org/whl/cu121 -r requirements.txt
+# Install dependencies with PyTorch CUDA 11.8 index
+RUN pip3 install --timeout=600 --extra-index-url https://download.pytorch.org/whl/cu118 -r requirements.txt
 
 # Copy setup.py and install package
 COPY setup.py ./

@@ -22,6 +22,7 @@
   "config": {
     "gpuTypeId": "NVIDIA A40",
     "gpuCount": 1,
+    "minGpuSdkVersion": "11.8",
     "env": [
       {
         "key": "USE_HF",

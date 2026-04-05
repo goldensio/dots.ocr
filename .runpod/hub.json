@@ -7,6 +7,7 @@
   "config": {
     "runsOn": "GPU",
     "containerDiskInGb": 50,
+    "minGpuSdkVersion": "11.8",
     "presets": [
       {
         "name": "Standard OCR",

@@ -72,9 +72,6 @@ class DotsMOCRParser:
             print(f"CUDA version: {torch.version.cuda}")
             print(f"GPU count: {torch.cuda.device_count()}")
             print(f"GPU name: {torch.cuda.get_device_name(0)}")
-            print(f"Current device: {torch.cuda.current_device()}")
-        else:
-            print("WARNING: CUDA is not available! Model will run on CPU.")
 
         # Try to use flash_attention_2, fall back to eager if not available
         try:
@@ -86,30 +83,41 @@ class DotsMOCRParser:
             print("flash_attn not available, using default attention")
 
         # Use self.model_name for HuggingFace model loading
-        # Can be HuggingFace model ID (e.g., "rednote-hilab/dots.mocr")
-        # or local path (e.g., "./weights/DotsMOCR")
         model_path = self.model_name
-
-        # Determine torch dtype based on GPU availability
-        if torch.cuda.is_available():
-            torch_dtype = torch.bfloat16
-        else:
-            print("WARNING: No GPU detected, using float32 instead of bfloat16")
-            torch_dtype = torch.float32
-
         print(f"Loading model from: {model_path}")
+
+        # Determine dtype - try float16 first (more compatible than bfloat16)
+        if torch.cuda.is_available():
+            torch_dtype = torch.float16
+            print("Using float16 (more compatible than bfloat16)")
+        else:
+            torch_dtype = torch.float32
+            print("Using float32 (CPU mode)")
+
         print(f"Using torch_dtype: {torch_dtype}")
 
-        # Load model with explicit device mapping if CUDA is available
+        # Load model with explicit device mapping and error handling
         if torch.cuda.is_available():
             print("Loading model with explicit CUDA device mapping...")
-            self.model = AutoModelForCausalLM.from_pretrained(
-                model_path,
-                attn_implementation=attn_impl,
-                dtype=torch_dtype,
-                device_map={"": "cuda:0"},  # Explicitly map to GPU
-                trust_remote_code=True
-            )
+            try:
+                self.model = AutoModelForCausalLM.from_pretrained(
+                    model_path,
+                    attn_implementation=attn_impl,
+                    dtype=torch_dtype,
+                    device_map={"": "cuda:0"},
+                    trust_remote_code=True
+                )
+            except Exception as e:
+                print(f"Failed with {torch_dtype}: {e}")
+                print("Retrying with float32...")
+                torch_dtype = torch.float32
+                self.model = AutoModelForCausalLM.from_pretrained(
+                    model_path,
+                    attn_implementation=attn_impl,
+                    dtype=torch_dtype,
+                    device_map={"": "cuda:0"},
+                    trust_remote_code=True
+                )
         else:
             print("Loading model on CPU...")
             self.model = AutoModelForCausalLM.from_pretrained(
@@ -124,7 +132,7 @@ class DotsMOCRParser:
         model_device = next(self.model.parameters()).device
         print(f"Model loaded on device: {model_device}")
         if model_device.type == "cpu" and torch.cuda.is_available():
-            print("ERROR: Model is on CPU despite CUDA being available!")
+            print("WARNING: Model is on CPU despite CUDA being available!")
             print("Force moving model to GPU...")
             self.model = self.model.to("cuda")
             model_device = next(self.model.parameters()).device
