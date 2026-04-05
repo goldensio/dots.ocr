@@ -1,0 +1,61 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
+.eggs
+*.log
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+demo/
+assets/
+*.md
+!.gitkeep
+
+# Output and temporary files
+output/
+tmp/
+temp/
+*.tmp
+
+# Model weights (too large for docker)
+weights/
+models/
+
+# Test files
+tests/
+test_*.py
+*_test.py

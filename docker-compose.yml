@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # dots.mocr Fast API
+  ocr-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dots-mocr-api
+    ports:
+      - "8080:8080"
+    environment:
+      - API_PORT=8080
+      - VLLM_PROTOCOL=http
+      - VLLM_IP=vllm-server
+      - VLLM_PORT=8000
+      - MODEL_NAME=rednote-hilab/dots.mocr
+      - TEMPERATURE=0.1
+      - TOP_P=1.0
+      - MAX_COMPLETION_TOKENS=32768
+      - NUM_THREAD=16
+      - DPI=200
+      - OUTPUT_DIR=/app/output
+      - USE_HF=false
+    volumes:
+      - ./output:/app/output
+    depends_on:
+      - vllm-server
+    restart: unless-stopped
+    networks:
+      - dots-mocr-network
+
+  # vLLM Server (optional - comment out if running separately)
+  vllm-server:
+    image: vllm/vllm-openai:v0.7.3
+    container_name: dots-mocr-vllm
+    ports:
+      - "8000:8000"
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+    command: >
+      --model rednote-hilab/dots.mocr
+      --tensor-parallel-size 1
+      --gpu-memory-utilization 0.9
+      --chat-template-content-format string
+      --trust-remote-code
+      --port 8000
+      --host 0.0.0.0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    networks:
+      - dots-mocr-network
+
+networks:
+  dots-mocr-network:
+    driver: bridge
+
+volumes:
+  output:
