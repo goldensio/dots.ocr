@@ -2,8 +2,9 @@
 FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
 
 # Install Python and system dependencies
+# Ubuntu 22.04 has Python 3.10, not 3.12
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.12 \
+    python3 \
     python3-pip \
     libglib2.0-0 \
     libsm6 \
@@ -12,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     libcairo2 \
     wget \
+    software-properties-common \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
