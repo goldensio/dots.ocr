@@ -10,8 +10,10 @@ modelscope
 # flash-attn==2.8.0.post2  # to speed up inference need flash-attn
 accelerate
 cairosvg
+torch
+torchvision
 
-# API dependencies
-fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
-python-multipart>=0.0.6
+# API dependencies - NOT NEEDED FOR SERVERLESS
+# fastapi>=0.104.0
+# uvicorn[standard]>=0.24.0
+# python-multipart>=0.0.6

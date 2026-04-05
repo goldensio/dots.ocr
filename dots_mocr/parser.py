@@ -65,10 +65,17 @@ class DotsMOCRParser:
         from transformers import AutoModelForCausalLM, AutoProcessor, AutoTokenizer
         from qwen_vl_utils import process_vision_info
 
+        # Try to use flash_attention_2, fall back to eager if not available
+        try:
+            import flash_attn
+            attn_impl = "flash_attention_2"
+        except ImportError:
+            attn_impl = None
+
         model_path = "./weights/DotsMOCR"
         self.model = AutoModelForCausalLM.from_pretrained(
             model_path,
-            attn_implementation="flash_attention_2",
+            attn_implementation=attn_impl,
             torch_dtype=torch.bfloat16,
             device_map="auto",
             trust_remote_code=True
@@ -105,7 +112,9 @@ class DotsMOCRParser:
             return_tensors="pt",
         )
 
-        inputs = inputs.to("cuda")
+        # Move inputs to the same device as the model
+        device = next(self.model.parameters()).device
+        inputs = inputs.to(device)
 
         # Inference: Generation of the output
         generated_ids = self.model.generate(**inputs, max_new_tokens=24000)
