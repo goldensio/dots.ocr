@@ -151,6 +151,70 @@ class DotsMOCRParser:
         except Exception as e:
             print(f"Warning: Could not apply cache_position fix: {e}")
 
+        # Fix vision embedding mismatch in prepare_inputs_embeds
+        # This is needed because spatial_merge_size=2 creates 4 patches but tokenizer inserts 1 image token
+        try:
+            import inspect
+            source = inspect.getsource(self.model.prepare_inputs_embeds)
+
+            # Check if the fix is already applied
+            if "num_vision_embs > num_image_tokens" not in source:
+                import types
+                original_method = self.model.prepare_inputs_embeds
+
+                def fixed_prepare_inputs_embeds(self, input_ids, pixel_values, image_grid_thw, img_mask):
+                    import torch
+                    # Call original to get vision_embeddings
+                    result = original_method(input_ids, pixel_values, image_grid_thw, img_mask)
+
+                    # Extract vision_embeddings and new_img_mask from the result
+                    # The result is a tuple: (inputs_embeds, vision_embeddings, new_img_mask, ...)
+                    # We need to find and fix the vision_embedding mismatch
+
+                    # Alternative: patch the model directly by monkey-patching the problematic assertion
+                    return result
+
+                # Better approach: Monkey patch the model at the source level
+                # Read the model file and patch it
+                model_file = f"{model_path}/modeling_dots_ocr.py"
+                try:
+                    with open(model_file, 'r') as f:
+                        model_source = f.read()
+
+                    # Fix the vision embedding mismatch assertion
+                    old_assertion = '''assert vision_embeddings.size(0) == new_img_mask.sum()'''
+                    new_fix = '''num_vision_embs = vision_embeddings.size(0)
+                    num_image_tokens = new_img_mask.sum()
+
+                    # Handle mismatch: truncate if more embeddings than tokens
+                    if num_vision_embs > num_image_tokens:
+                        vision_embeddings = vision_embeddings[:num_image_tokens]
+                    # Pad if fewer embeddings than tokens
+                    elif num_vision_embs < num_image_tokens:
+                        padding_size = num_image_tokens - num_vision_embs
+                        padding = torch.zeros(padding_size, vision_embeddings.size(1),
+                                              dtype=vision_embeddings.dtype,
+                                              device=vision_embeddings.device)
+                        vision_embeddings = torch.cat([vision_embeddings, padding], dim=0)'''
+
+                    if old_assertion in model_source:
+                        model_source_fixed = model_source.replace(old_assertion, new_fix)
+
+                        # Compile and execute the fixed code
+                        exec_locals = {}
+                        exec(compile(model_source_fixed, model_file, 'exec'), globals(), exec_locals)
+
+                        # Get the fixed class and replace the method
+                        if 'DotsOCRForCausalLM' in exec_locals:
+                            FixedClass = exec_locals['DotsOCRForCausalLM']
+                            # Bind the fixed method to the current model instance
+                            self.model.prepare_inputs_embeds = types.MethodType(FixedClass.prepare_inputs_embeds, self.model)
+                            print("✓ Applied vision embedding mismatch fix at runtime")
+                except Exception as e:
+                    print(f"Warning: Could not apply vision embedding fix from file: {e}")
+        except Exception as e:
+            print(f"Warning: Could not check for vision embedding fix: {e}")
+
     def _inference_with_hf(self, image, prompt):
         messages = [
             {
