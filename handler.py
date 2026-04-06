@@ -7,7 +7,6 @@ import tempfile
 import base64
 from typing import Optional
 from PIL import Image
-
 import runpod  # Required
 
 from dots_mocr.parser import DotsMOCRParser
