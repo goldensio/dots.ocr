@@ -49,7 +49,7 @@ except ImportError:
         return False
 
 def fix_model_config(config_path):
-    """Fix torch_dtype in model config.json to use auto for PyTorch 2.5+ compatibility."""
+    """Ensure torch_dtype in model config.json is set to bfloat16 for RTX 5090."""
     try:
         with open(config_path, 'r') as f:
             config = json.load(f)
@@ -57,9 +57,9 @@ def fix_model_config(config_path):
         original_dtype = config.get("torch_dtype")
         print(f"Original torch_dtype in config: {original_dtype}")
 
-        # Use auto for PyTorch 2.5+ to handle dtype optimally
-        config["torch_dtype"] = "auto"
-        print("✓ Set torch_dtype to auto for optimal dtype handling")
+        # Use bfloat16 for RTX 5090 with CUDA 12.4
+        config["torch_dtype"] = "bfloat16"
+        print("✓ Set torch_dtype to bfloat16 for RTX 5090")
 
         # Write the fixed config
         with open(config_path, 'w') as f:

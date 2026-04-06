@@ -86,18 +86,18 @@ class DotsMOCRParser:
         model_path = self.model_name
         print(f"Loading model from: {model_path}")
 
-        # Load model with auto dtype for optimal performance
-        # PyTorch 2.5+ and transformers 4.46+ handle dtype properly
+        # Load model with bfloat16 for optimal RTX 5090 performance
+        # PyTorch 2.5+ and transformers 4.46+ handle bfloat16 properly
         if torch.cuda.is_available():
-            print("Loading model with auto dtype for optimal CUDA performance...")
+            print("Loading model with bfloat16 for optimal CUDA performance...")
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_path,
                 attn_implementation=attn_impl,
-                torch_dtype="auto",  # Auto-detect optimal dtype
+                torch_dtype=torch.bfloat16,  # bfloat16 for RTX 5090
                 device_map={"": "cuda:0"},
                 trust_remote_code=True
             )
-            print("✓ Model loaded successfully")
+            print("✓ Model loaded successfully with bfloat16")
         else:
             print("Loading model on CPU...")
             self.model = AutoModelForCausalLM.from_pretrained(
