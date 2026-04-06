@@ -1,9 +1,9 @@
 # Dockerfile for RunPod Serverless - dots.mocr OCR
-# Use CUDA 11.8 for better driver compatibility
-FROM nvidia/cuda:11.8.0-devel-ubuntu22.04
+# Use CUDA 12.4 for RTX 5090 sm_120 compute capability support
+FROM nvidia/cuda:12.4.0-devel-ubuntu22.04
 
 # Install Python and system dependencies
-# Ubuntu 22.04 has Python 3.10, not 3.12
+# Ubuntu 22.04 has Python 3.10
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
@@ -27,8 +27,8 @@ RUN pip3 install --upgrade pip wheel setuptools
 # Copy requirements first (for better caching)
 COPY requirements.txt ./
 
-# Install dependencies with PyTorch CUDA 11.8 index
-RUN pip3 install --timeout=600 --extra-index-url https://download.pytorch.org/whl/cu118 -r requirements.txt
+# Install dependencies with PyTorch CUDA 12.4 index
+RUN pip3 install --timeout=600 --extra-index-url https://download.pytorch.org/whl/cu124 -r requirements.txt
 
 # Copy setup.py and install package
 COPY setup.py ./
@@ -43,13 +43,9 @@ RUN python3 tools/download_model.py && \
     mv weights/DotsMOCR /model && \
     rm -rf weights
 
-# Apply all fixes: flash_attn, config dtype, Qwen2_5_VL import, grid_thw None check, prepare_inputs_for_generation, vision embedding mismatch, and filter kwargs for logits_to_keep
-RUN python3 tools/fix_flash_attn.py /model/modeling_dots_vision.py /model/config.json && \
-    python3 tools/fix_qwen_import.py /model/configuration_dots.py && \
-    python3 tools/fix_grid_thw.py /model/modeling_dots_ocr.py && \
-    python3 tools/fix_prepare_inputs.py /model/modeling_dots_ocr.py && \
-    python3 tools/fix_vision_embedding_mismatch.py /model/modeling_dots_ocr.py && \
-    python3 tools/fix_filter_kwargs.py /model/modeling_dots_ocr.py
+# Apply fixes: flash_attn optional import and config dtype
+# Note: Many compatibility fixes no longer needed with PyTorch 2.5+ and transformers 4.46+
+RUN python3 tools/fix_flash_attn.py /model/modeling_dots_vision.py /model/config.json
 
 # Copy handler and application code
 COPY handler.py .

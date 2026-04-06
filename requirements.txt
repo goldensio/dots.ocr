@@ -1,11 +1,11 @@
-# NumPy 1.26.4 for PyTorch 2.1.2 compatibility (NumPy 2.x has breaking changes)
+# NumPy 2.1.2 for PyTorch 2.5+ compatibility
 # IMPORTANT: Install NumPy first before other packages to prevent version conflicts
-numpy==1.26.4
+numpy>=2.1.0
 
-# PyTorch with CUDA 11.8 support
-# Pin to version 2.1.x for stable CUDA 11.8 builds
-torch==2.1.2
-torchvision==0.16.2
+# PyTorch with CUDA 12.4 support for RTX 5090 (sm_120 compute capability)
+# PyTorch 2.5+ required for CUDA 12.x and sm_120 support
+torch==2.5.1
+torchvision==0.20.1
 
 # RunPod Serverless
 runpod
@@ -16,7 +16,7 @@ gradio
 PyMuPDF
 openai
 qwen_vl_utils
-transformers==4.45.0
+transformers>=4.46.0
 huggingface_hub
 modelscope
 # flash-attn==2.8.0.post2  # to speed up inference need flash-attn

@@ -49,7 +49,7 @@ except ImportError:
         return False
 
 def fix_model_config(config_path):
-    """Fix torch_dtype in model config.json to use float16 instead of bfloat16."""
+    """Fix torch_dtype in model config.json to use auto for PyTorch 2.5+ compatibility."""
     try:
         with open(config_path, 'r') as f:
             config = json.load(f)
@@ -57,12 +57,9 @@ def fix_model_config(config_path):
         original_dtype = config.get("torch_dtype")
         print(f"Original torch_dtype in config: {original_dtype}")
 
-        # Change bfloat16 to float16 for better compatibility
-        if config.get("torch_dtype") == "bfloat16":
-            config["torch_dtype"] = "float16"
-            print("✓ Changed torch_dtype from bfloat16 to float16")
-        else:
-            print(f"✓ torch_dtype is {config.get('torch_dtype')}, no change needed")
+        # Use auto for PyTorch 2.5+ to handle dtype optimally
+        config["torch_dtype"] = "auto"
+        print("✓ Set torch_dtype to auto for optimal dtype handling")
 
         # Write the fixed config
         with open(config_path, 'w') as f:
