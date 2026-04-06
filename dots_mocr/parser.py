@@ -137,8 +137,8 @@ class DotsMOCRParser:
 
         # Preparation for inference
         text = self.processor.apply_chat_template(
-            messages, 
-            tokenize=False, 
+            messages,
+            tokenize=False,
             add_generation_prompt=True
         )
         image_inputs, video_inputs = self.process_vision_info(messages)
@@ -159,13 +159,31 @@ class DotsMOCRParser:
         unused_kwargs = ['mm_token_type_ids']
         filtered_inputs = {k: v for k, v in inputs.items() if k not in unused_kwargs}
         generated_ids = self.model.generate(**filtered_inputs, max_new_tokens=24000)
+
+        # Handle None case
+        if generated_ids is None:
+            print("Warning: Model generation returned None")
+            return ""
+
         generated_ids_trimmed = [
             out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
         ]
-        response = self.processor.batch_decode(
-            generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
-        )[0]
-        return response
+
+        # Decode with error handling
+        try:
+            decoded = self.processor.batch_decode(
+                generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
+            )
+            if decoded and len(decoded) > 0:
+                return decoded[0]
+            else:
+                print("Warning: Processor returned empty decode result")
+                return ""
+        except Exception as e:
+            print(f"Error decoding model output: {e}")
+            import traceback
+            traceback.print_exc()
+            return ""
 
     def _inference_with_vllm(self, image, prompt, prompt_mode):
         system_prompt = "You are a helpful assistant."
@@ -234,25 +252,69 @@ class DotsMOCRParser:
         
         if temperature != None:
             self.temperature = temperature
-        if self.use_hf:
-            response = self._inference_with_hf(image, prompt)
-        else:
-            response = self._inference_with_vllm(image, prompt, prompt_mode)
+
+        # Call inference and handle potential errors
+        try:
+            if self.use_hf:
+                response = self._inference_with_hf(image, prompt)
+            else:
+                response = self._inference_with_vllm(image, prompt, prompt_mode)
+        except Exception as e:
+            print(f"Error during inference: {e}")
+            import traceback
+            traceback.print_exc()
+            # Return error result instead of None
+            result = {
+                'page_no': page_idx,
+                "input_height": input_height,
+                "input_width": input_width,
+                "error": str(e)
+            }
+            return result
+
         result = {'page_no': page_idx,
             "input_height": input_height,
             "input_width": input_width
         }
         if source == 'pdf':
             save_name = f"{save_name}_page_{page_idx}"
+
+        # Check if response is valid
+        if not response or response == "":
+            print(f"Warning: Empty response received for prompt_mode: {prompt_mode}")
+            # Create error result with empty markdown
+            md_file_path = os.path.join(save_dir, f"{save_name}.md")
+            with open(md_file_path, "w", encoding="utf-8") as md_file:
+                md_file.write("")  # Empty markdown
+            result.update({
+                'md_content_path': md_file_path,
+                'error': 'Empty model response'
+            })
+            return result
+
         if prompt_mode in ['prompt_layout_all_en', 'prompt_layout_only_en', 'prompt_grounding_ocr', 'prompt_web_parsing']:
-            cells, filtered = post_process_output(
-                response, 
-                prompt_mode, 
-                origin_image, 
-                image,
-                min_pixels=min_pixels, 
-                max_pixels=max_pixels,
+            try:
+                cells, filtered = post_process_output(
+                    response,
+                    prompt_mode,
+                    origin_image,
+                    image,
+                    min_pixels=min_pixels,
+                    max_pixels=max_pixels,
                 )
+            except Exception as e:
+                print(f"Error in post_process_output: {e}")
+                import traceback
+                traceback.print_exc()
+                # Create result with raw response
+                md_file_path = os.path.join(save_dir, f"{save_name}.md")
+                with open(md_file_path, "w", encoding="utf-8") as md_file:
+                    md_file.write(response)
+                result.update({
+                    'md_content_path': md_file_path,
+                    'error': f'post_process_output failed: {str(e)}'
+                })
+                return result
             if filtered and prompt_mode != 'prompt_layout_only_en':  # model output json failed, use filtered process
                 json_file_path = os.path.join(save_dir, f"{save_name}.json")
                 with open(json_file_path, 'w', encoding="utf-8") as w:

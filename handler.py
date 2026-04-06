@@ -202,6 +202,8 @@ def handler(event):
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
+        print(f"Handler exception: {str(e)}")
+        print(f"Traceback: {error_details}")
         return {
             "error": f"OCR processing failed: {str(e)}",
             "traceback": error_details
