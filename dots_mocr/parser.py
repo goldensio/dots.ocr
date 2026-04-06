@@ -86,46 +86,30 @@ class DotsMOCRParser:
         model_path = self.model_name
         print(f"Loading model from: {model_path}")
 
-        # Load model and convert to uniform dtype to fix dtype mismatch errors
+        # Load model with float16 for better CUDA compatibility
         # The model has mixed dtypes (bfloat16 and float16), so we need to unify them
         if torch.cuda.is_available():
-            print("Loading model and converting to uniform dtype...")
-            # A40 GPU supports bfloat16 natively, try that first
+            print("Loading model with float16 for CUDA compatibility...")
             try:
                 self.model = AutoModelForCausalLM.from_pretrained(
                     model_path,
                     attn_implementation=attn_impl,
-                    torch_dtype=torch.bfloat16,  # Use bfloat16 (A40 supports it natively)
+                    torch_dtype=torch.float16,  # Use float16 (more CUDA kernels support it)
                     device_map={"": "cuda:0"},
                     trust_remote_code=True
                 )
-                print("✓ Model loaded and converted to bfloat16")
+                print("✓ Model loaded with float16")
             except Exception as e:
-                print(f"Failed with bfloat16: {e}")
-                print("Retrying with float16...")
-                try:
-                    self.model = AutoModelForCausalLM.from_pretrained(
-                        model_path,
-                        attn_implementation=attn_impl,
-                        torch_dtype=torch.float16,
-                        device_map={"": "cuda:0"},
-                        trust_remote_code=True
-                    )
-                    print("✓ Model loaded and converted to float16")
-                except Exception as e2:
-                    print(f"Failed with float16: {e2}")
-                    print("Loading with auto-detection and converting after load...")
-                    self.model = AutoModelForCausalLM.from_pretrained(
-                        model_path,
-                        attn_implementation=attn_impl,
-                        torch_dtype="auto",
-                        device_map={"": "cuda:0"},
-                        trust_remote_code=True
-                    )
-                    # Convert all parameters to bfloat16 to unify dtypes
-                    print("Converting all model parameters to bfloat16...")
-                    self.model.to(torch.bfloat16)
-                    print("✓ Model converted to bfloat16")
+                print(f"Failed with float16: {e}")
+                print("Retrying with bfloat16...")
+                self.model = AutoModelForCausalLM.from_pretrained(
+                    model_path,
+                    attn_implementation=attn_impl,
+                    torch_dtype=torch.bfloat16,
+                    device_map={"": "cuda:0"},
+                    trust_remote_code=True
+                )
+                print("✓ Model loaded with bfloat16")
         else:
             print("Loading model on CPU...")
             self.model = AutoModelForCausalLM.from_pretrained(
