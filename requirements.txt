@@ -1,8 +1,8 @@
 # streamlit
 torch==2.7.0 
 torchvision==0.22.0
-runpod
-gradio
+runpod==1.8.2
+gradio==6.11.0
 # gradio_image_annotation
 PyMuPDF
 openai
