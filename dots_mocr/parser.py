@@ -59,16 +59,14 @@ class DotsMOCRParser:
         assert self.max_pixels is None or self.max_pixels <= MAX_PIXELS
 
     def _patch_cached_model_files(self):
-        """Patch the cached model files that were created when the model loaded."""
+        """Directly patch the cached model file to fix cache_position None error."""
         import os
-        import torch
 
         cache_dir = os.path.expanduser("~/.cache/huggingface/modules/transformers_modules")
         if not os.path.exists(cache_dir):
             print("No cache directory found, skipping patches")
             return
 
-        # Find the cached model directory
         patched = False
         for root, dirs, files in os.walk(cache_dir):
             if 'modeling_dots_ocr.py' in files:
@@ -78,68 +76,46 @@ class DotsMOCRParser:
                 with open(model_file, 'r') as f:
                     content = f.read()
 
-                modified = False
-
-                # Patch 1: Fix cache_position None
-                if 'if cache_position is None:' not in content and 'cache_position[0]' in content:
-                    # Find the prepare_inputs_for_generation method
-                    old_code = '''    def prepare_inputs_for_generation(
-        self,
-        input_ids,
-        past_key_values=None,
-        inputs_embeds=None,
-        **kwargs,
-    ):
-        model_inputs = self.prepare_inputs_for_generation('''
-
-                    if old_code in content:
-                        new_code = '''    def prepare_inputs_for_generation(
-        self,
-        input_ids,
-        past_key_values=None,
-        inputs_embeds=None,
-        **kwargs,
-    ):
-        # Fix cache_position None issue
-        if 'cache_position' in kwargs and kwargs['cache_position'] is None:
-            import torch
-            device = input_ids.device if hasattr(input_ids, 'device') else 'cuda'
-            kwargs['cache_position'] = torch.zeros(1, dtype=torch.long, device=device)
-
-        model_inputs = self.prepare_inputs_for_generation('''
-                        content = content.replace(old_code, new_code)
-                        modified = True
-                        print("✓ Patched cache_position None fix")
-
-                # Patch 2: Fix vision embedding mismatch
-                if 'assert vision_embeddings.size(0) == new_img_mask.sum()' in content:
-                    old_assertion = 'assert vision_embeddings.size(0) == new_img_mask.sum()'
-                    new_fix = '''num_vision_embs = vision_embeddings.size(0)
-        num_image_tokens = new_img_mask.sum()
-
-        # Handle mismatch: truncate if more embeddings than tokens
-        if num_vision_embs > num_image_tokens:
-            vision_embeddings = vision_embeddings[:num_image_tokens]
-        # Pad if fewer embeddings than tokens
-        elif num_vision_embs < num_image_tokens:
-            padding_size = num_image_tokens - num_vision_embs
-            padding = torch.zeros(padding_size, vision_embeddings.size(1),
-                                  dtype=vision_embeddings.dtype,
-                                  device=vision_embeddings.device)
-            vision_embeddings = torch.cat([vision_embeddings, padding], dim=0)'''
-
-                    content = content.replace(old_assertion, new_fix)
-                    modified = True
-                    print("✓ Patched vision embedding mismatch fix")
-
-                if modified:
+                # Simple, direct replacement for the problematic line
+                # Replace: if cache_position[0] == 0:
+                # With: if cache_position is None: cache_position = torch.zeros(1, dtype=torch.long, device='cuda')
+                #        if cache_position[0] == 0:
+                if 'if cache_position[0] == 0:' in content:
+                    content = content.replace(
+                        'if cache_position[0] == 0:',
+                        '''if cache_position is None:
+                        import torch
+                        cache_position = torch.zeros(1, dtype=torch.long, device='cuda')
+                    if cache_position[0] == 0:'''
+                    )
                     with open(model_file, 'w') as f:
                         f.write(content)
-                    print(f"✓ Successfully patched {model_file}")
+                    print("✓ Patched cache_position None fix")
                     patched = True
+                else:
+                    print("⚠ Line not found in expected format")
 
         if not patched:
-            print("No cached model file found to patch")
+            print("⚠ Could not patch - trying alternative method")
+            # Alternative: patch at runtime using sys.modules
+            import sys
+            import torch
+            for module_name, module in sys.modules.items():
+                if module and hasattr(module, 'DotsOCRForCausalLM'):
+                    model_cls = getattr(module, 'DotsOCRForCausalLM')
+                    original = model_cls.prepare_inputs_for_generation
+                    def wrapped(self, input_ids, **kwargs):
+                        if 'cache_position' in kwargs and kwargs['cache_position'] is None:
+                            device = input_ids.device if hasattr(input_ids, 'device') else 'cuda'
+                            kwargs['cache_position'] = torch.zeros(1, dtype=torch.long, device=device)
+                        return original(self, input_ids, **kwargs)
+                    model_cls.prepare_inputs_for_generation = wrapped
+                    print("✓ Applied runtime patch via sys.modules")
+                    patched = True
+                    break
+
+        if not patched:
+            print("✗ All patching methods failed")
 
     def _load_hf_model(self):
         import torch
