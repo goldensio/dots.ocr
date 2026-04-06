@@ -43,12 +43,13 @@ RUN python3 tools/download_model.py && \
     mv weights/DotsMOCR /model && \
     rm -rf weights
 
-# Apply all fixes: flash_attn, config dtype, Qwen2_5_VL import, grid_thw None check, prepare_inputs_for_generation, and vision embedding mismatch
+# Apply all fixes: flash_attn, config dtype, Qwen2_5_VL import, grid_thw None check, prepare_inputs_for_generation, vision embedding mismatch, and filter kwargs for logits_to_keep
 RUN python3 tools/fix_flash_attn.py /model/modeling_dots_vision.py /model/config.json && \
     python3 tools/fix_qwen_import.py /model/configuration_dots.py && \
     python3 tools/fix_grid_thw.py /model/modeling_dots_ocr.py && \
     python3 tools/fix_prepare_inputs.py /model/modeling_dots_ocr.py && \
-    python3 tools/fix_vision_embedding_mismatch.py /model/modeling_dots_ocr.py
+    python3 tools/fix_vision_embedding_mismatch.py /model/modeling_dots_ocr.py && \
+    python3 tools/fix_filter_kwargs.py /model/modeling_dots_ocr.py
 
 # Copy handler and application code
 COPY handler.py .
