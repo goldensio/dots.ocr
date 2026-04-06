@@ -1,81 +1,42 @@
 #!/usr/bin/env python3
 """
-Fix logits_to_keep error by filtering it from **kwargs in forward()
-This intercepts kwargs and removes unsupported parameters for transformers 4.45.0
+Fix logits_to_keep error by removing it from forward() signature
+The transformers 4.45.0 Qwen2ForCausalLM.forward() doesn't support logits_to_keep
 """
 import sys
 
 def fix_filter_kwargs(file_path):
-    """Filter logits_to_keep and num_logits_to_keep from **kwargs in forward()"""
+    """Remove logits_to_keep from forward() signature and filter from loss_kwargs"""
     try:
         with open(file_path, 'r') as f:
             content = f.read()
 
-        # Find the forward method and add kwargs filtering
-        old_forward_start = '''    def forward(
-        self,
-        input_ids: torch.LongTensor,
-        pixel_values: Optional[torch.FloatTensor] = None,
-        image_grid_thw: Optional[torch.FloatTensor] = None,
-        inputs_embeds: Optional[torch.Tensor] = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_values: Optional[List[torch.FloatTensor]] = None,
-        labels: Optional[torch.LongTensor] = None,
-        use_cache: Optional[bool] = None,
-        output_attentions: Optional[bool] = None,
-        output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
-    ) -> Union[Tuple, CausalLMOutputWithPast]:'''
+        # Remove logits_to_keep from the method signature
+        old_signature = '''        logits_to_keep: int = 0,
+        **loss_kwargs,'''
 
-        new_forward_start = '''    def forward(
-        self,
-        input_ids: torch.LongTensor,
-        pixel_values: Optional[torch.FloatTensor] = None,
-        image_grid_thw: Optional[torch.FloatTensor] = None,
-        inputs_embeds: Optional[torch.Tensor] = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_values: Optional[List[torch.FloatTensor]] = None,
-        labels: Optional[torch.LongTensor] = None,
-        use_cache: Optional[bool] = None,
-        output_attentions: Optional[bool] = None,
-        output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
-        **kwargs,  # Accept **kwargs to filter out unsupported parameters
-    ) -> Union[Tuple, CausalLMOutputWithPast]:
-        # Filter out unsupported parameters for transformers 4.45.0 compatibility
-        # Remove logits_to_keep and num_logits_to_keep from kwargs
-        kwargs.pop('logits_to_keep', None)
-        kwargs.pop('num_logits_to_keep', None)'''
+        new_signature = '''        **loss_kwargs,'''
 
-        if old_forward_start in content:
-            content = content.replace(old_forward_start, new_forward_start)
-            print("✓ Added **kwargs parameter and filtering to forward() method")
+        if old_signature in content:
+            content = content.replace(old_signature, new_signature)
+            print("✓ Removed logits_to_keep from forward() signature")
         else:
-            print("✓ Forward method already has **kwargs or pattern not found")
+            print("✓ Forward signature already updated or pattern not found")
 
-        # Now modify the super().forward() call to pass filtered kwargs
-        old_super_forward = '''        outputs = super().forward(
-            inputs_embeds=inputs_embeds,
-            attention_mask=attention_mask,
-            position_ids=position_ids,
-            past_key_values=past_key_values,
-        )'''
+        # Filter logits_to_keep from loss_kwargs before processing
+        old_line1 = '''    ) -> Union[Tuple, CausalLMOutputWithPast]:
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict'''
 
-        new_super_forward = '''        outputs = super().forward(
-            inputs_embeds=inputs_embeds,
-            attention_mask=attention_mask,
-            position_ids=position_ids,
-            past_key_values=past_key_values,
-            **kwargs,  # Pass filtered kwargs
-        )'''
+        new_line1 = '''    ) -> Union[Tuple, CausalLMOutputWithPast]:
+        # Filter out logits_to_keep from loss_kwargs for transformers 4.45.0 compatibility
+        loss_kwargs.pop('logits_to_keep', None)
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict'''
 
-        if old_super_forward in content:
-            content = content.replace(old_super_forward, new_super_forward)
-            print("✓ Modified super().forward() to pass filtered kwargs")
+        if old_line1 in content:
+            content = content.replace(old_line1, new_line1)
+            print("✓ Added logits_to_keep filtering from loss_kwargs")
         else:
-            print("✓ Super forward call already modified or pattern not found")
+            print("✓ Filtering already added or pattern not found")
 
         # Write the fixed content
         with open(file_path, 'w') as f:
