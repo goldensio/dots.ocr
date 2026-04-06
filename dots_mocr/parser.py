@@ -138,7 +138,7 @@ class DotsMOCRParser:
             model_device = next(self.model.parameters()).device
             print(f"Model now on device: {model_device}")
 
-        self.processor = AutoProcessor.from_pretrained(model_path,  trust_remote_code=True,use_fast=True)
+        self.processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
         self.process_vision_info = process_vision_info
 
     def _inference_with_hf(self, image, prompt):

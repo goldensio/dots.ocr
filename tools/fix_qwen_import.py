@@ -36,22 +36,48 @@ from transformers import AutoProcessor'''
         else:
             print("✓ Import already fixed or not found")
 
-        # Fix 2: Update DotsVLProcessor to use fallback
-        old_class = '''class DotsVLProcessor(Qwen2_5_VLProcessor):'''
+        # Fix 2: Replace the entire DotsVLProcessor class definition
+        # This replaces from class definition to the end of the file
+        old_class_pattern = r'''class DotsVLProcessor\(Qwen2_5_VLProcessor\):
+    def __init__\(self, image_processor=None, tokenizer=None, video_processor=None, chat_template=None, \*\*kwargs\):
+        super\(\).__init__\(image_processor, tokenizer, video_processor, chat_template=chat_template\)
+        self\.image_token = "<\|imgpad\|>" if not hasattr\(tokenizer, "image_token"\) else tokenizer\.image_token
+        self\.image_token_id = 151665
+        self\.video_token = "<\|video_pad\|>" if not hasattr\(tokenizer, "video_token"\) else tokenizer\.video_token
+        self\.video_token_id = 151656
+
+AutoProcessor\.register\("dots_ocr", DotsVLProcessor\)'''
 
         new_class = '''class DotsVLProcessor(Qwen2_5_VLProcessor if HAS_QWEN2_5_VL else AutoProcessor):
     """Dots Vision-Language Processor for OCR tasks."""
 
     def __init__(self, image_processor=None, tokenizer=None, video_processor=None, chat_template=None, **kwargs):
-        # Remove chat_template from kwargs to avoid duplicate argument error
-        kwargs.pop('chat_template', None)
-
-        if HAS_QWEN2_5_VL:
-            # Use Qwen2_5_VLProcessor or Qwen2VLProcessor
-            super().__init__(image_processor, tokenizer, video_processor, chat_template=chat_template, **kwargs)
+        # CRITICAL: Handle chat_template to prevent duplicate keyword argument error
+        # The parent class might receive chat_template from kwargs, so we need to ensure
+        # it's only passed once
+        if 'chat_template' in kwargs:
+            # chat_template is in kwargs, use that value
+            chat_template_arg = kwargs.pop('chat_template')
         else:
-            # Fallback to AutoProcessor
-            AutoProcessor.__init__(self, image_processor, tokenizer, video_processor, chat_template=chat_template, **kwargs)
+            # Use the explicitly passed chat_template parameter
+            chat_template_arg = chat_template
+
+        # Call parent __init__ with all parameters as keyword arguments
+        # This avoids issues with positional vs keyword argument ordering
+        if HAS_QWEN2_5_VL:
+            super().__init__(
+                image_processor=image_processor,
+                tokenizer=tokenizer,
+                video_processor=video_processor,
+                chat_template=chat_template_arg
+            )
+        else:
+            AutoProcessor.__init__(self,
+                image_processor=image_processor,
+                tokenizer=tokenizer,
+                video_processor=video_processor,
+                chat_template=chat_template_arg
+            )
 
         self.image_token = "<|imgpad|>" if not hasattr(tokenizer, "image_token") else tokenizer.image_token
         self.image_token_id = 151665
@@ -62,25 +88,66 @@ from transformers import AutoProcessor'''
     if not HAS_QWEN2_5_VL:
         def __call__(self, *args, **kwargs):
             """Forward to AutoProcessor's call method."""
-            return AutoProcessor.__call__(self, *args, **kwargs)'''
+            return AutoProcessor.__call__(self, *args, **kwargs)
 
-        if old_class in content:
-            content = content.replace(old_class, new_class)
-            print("✓ Added fallback for DotsVLProcessor")
+AutoProcessor.register("dots_ocr", DotsVLProcessor)'''
+
+        # Try regex replacement first
+        pattern = re.compile(old_class_pattern, re.DOTALL)
+        if pattern.search(content):
+            content = pattern.sub(new_class, content)
+            print("✓ Replaced DotsVLProcessor class with fallback (regex)")
         else:
-            print("✓ DotsVLProcessor already patched or not found")
+            # Fallback: try simple string replacement for the __init__ method
+            old_init = '''    def __init__(self, image_processor=None, tokenizer=None, video_processor=None, chat_template=None, **kwargs):
+        super().__init__(image_processor, tokenizer, video_processor, chat_template=chat_template)'''
 
-        # Also fix the original __init__ if it exists separately
-        old_init = '''    def __init__(self, image_processor=None, tokenizer=None, video_processor=None, chat_template=None, **kwargs):
-        super().__init__(image_processor, tokenizer, video_processor, chat_template=chat_template)
-        self.image_token = "<|imgpad|>" if not hasattr(tokenizer, "image_token") else tokenizer.image_token
-        self.image_token_id = 151665
-        self.video_token = "<|video_pad|>" if not hasattr(tokenizer, "video_token") else tokenizer.video_token
-        self.video_token_id = 151656'''
+            new_init = '''    def __init__(self, image_processor=None, tokenizer=None, video_processor=None, chat_template=None, **kwargs):
+        # CRITICAL: Handle chat_template to prevent duplicate keyword argument error
+        if 'chat_template' in kwargs:
+            chat_template_arg = kwargs.pop('chat_template')
+        else:
+            chat_template_arg = chat_template
 
-        if old_init in content:
-            content = content.replace(old_init, '')
-            print("✓ Removed duplicate __init__ method")
+        # Pass all parameters as keyword arguments to avoid ordering issues
+        if HAS_QWEN2_5_VL:
+            super().__init__(
+                image_processor=image_processor,
+                tokenizer=tokenizer,
+                video_processor=video_processor,
+                chat_template=chat_template_arg
+            )
+        else:
+            AutoProcessor.__init__(self,
+                image_processor=image_processor,
+                tokenizer=tokenizer,
+                video_processor=video_processor,
+                chat_template=chat_template_arg
+            )'''
+
+            if old_init in content:
+                # Also need to update the class definition
+                old_class_def = 'class DotsVLProcessor(Qwen2_5_VLProcessor):'
+                new_class_def = 'class DotsVLProcessor(Qwen2_5_VLProcessor if HAS_QWEN2_5_VL else AutoProcessor):'
+                content = content.replace(old_class_def, new_class_def)
+
+                content = content.replace(old_init, new_init)
+
+                # Add the __call__ method if it doesn't exist
+                if 'def __call__(self' not in content and 'if not HAS_QWEN2_5_VL:' not in content:
+                    content = content.replace(
+                        'AutoProcessor.register("dots_ocr", DotsVLProcessor)',
+                        '''    # Add any missing methods from parent if needed
+    if not HAS_QWEN2_5_VL:
+        def __call__(self, *args, **kwargs):
+            """Forward to AutoProcessor's call method."""
+            return AutoProcessor.__call__(self, *args, **kwargs)
+
+AutoProcessor.register("dots_ocr", DotsVLProcessor)'''
+                    )
+                print("✓ Updated DotsVLProcessor with fallback (simple)")
+            else:
+                print("✓ DotsVLProcessor already patched or pattern not found")
 
         # Write the fixed content
         with open(file_path, 'w') as f:
@@ -91,6 +158,8 @@ from transformers import AutoProcessor'''
 
     except Exception as e:
         print(f"✗ Error fixing {file_path}: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
         return False
 
 if __name__ == "__main__":
