@@ -3,19 +3,18 @@ import json
 from tqdm import tqdm
 from multiprocessing.pool import ThreadPool, Pool
 import argparse
-from PIL import Image
-
-from dots_mocr.model.inference import inference_with_vllm
-from dots_mocr.utils.consts import image_extensions, MIN_PIXELS, MAX_PIXELS
-from dots_mocr.utils.image_utils import get_image_by_fitz_doc, fetch_image, smart_resize
-from dots_mocr.utils.doc_utils import fitz_doc_to_image, load_images_from_pdf
-from dots_mocr.utils.prompts import dict_promptmode_to_prompt
-from dots_mocr.utils.layout_utils import post_process_output, draw_layout_on_image, pre_process_bboxes, parse_scene_text_output, post_process_scene_text, draw_scene_text_on_image, format_scene_text_to_markdown
-from dots_mocr.utils.svg_utils import extract_svg_from_response, svg_to_png, create_comparison_image
-from dots_mocr.utils.format_transformer import layoutjson2md
 
 
-class DotsMOCRParser:
+from dots_ocr.model.inference import inference_with_vllm
+from dots_ocr.utils.consts import image_extensions, MIN_PIXELS, MAX_PIXELS
+from dots_ocr.utils.image_utils import get_image_by_fitz_doc, fetch_image, smart_resize
+from dots_ocr.utils.doc_utils import fitz_doc_to_image, load_images_from_pdf
+from dots_ocr.utils.prompts import dict_promptmode_to_prompt
+from dots_ocr.utils.layout_utils import post_process_output, draw_layout_on_image, pre_process_bboxes
+from dots_ocr.utils.format_transformer import layoutjson2md
+
+
+class DotsOCRParser:
     """
     parse image or pdf file
     """
@@ -27,7 +26,7 @@ class DotsMOCRParser:
             model_name='model',
             temperature=0.1,
             top_p=1.0,
-            max_completion_tokens=32768,
+            max_completion_tokens=16384,
             num_thread=64,
             dpi = 200, 
             output_dir="./output", 
@@ -64,62 +63,74 @@ class DotsMOCRParser:
         import torch
         from transformers import AutoModelForCausalLM, AutoProcessor, AutoTokenizer
         from qwen_vl_utils import process_vision_info
+        import re
 
-        # Verify CUDA availability
-        print(f"PyTorch version: {torch.__version__}")
-        print(f"CUDA available: {torch.cuda.is_available()}")
-        if torch.cuda.is_available():
-            print(f"CUDA version: {torch.version.cuda}")
-            print(f"GPU count: {torch.cuda.device_count()}")
-            print(f"GPU name: {torch.cuda.get_device_name(0)}")
-
-        # Try to use flash_attention_2, fall back to eager if not available
-        try:
-            import flash_attn
-            attn_impl = "flash_attention_2"
-            print("Using flash_attention_2")
-        except ImportError:
-            attn_impl = None
-            print("flash_attn not available, using default attention")
-
-        # Use self.model_name for HuggingFace model loading
-        model_path = self.model_name
-        print(f"Loading model from: {model_path}")
-
-        # Load model with bfloat16 for optimal RTX 5090 performance
-        # PyTorch 2.5+ and transformers 4.46+ handle bfloat16 properly
-        if torch.cuda.is_available():
-            print("Loading model with bfloat16 for optimal CUDA performance...")
-            self.model = AutoModelForCausalLM.from_pretrained(
-                model_path,
-                attn_implementation=attn_impl,
-                torch_dtype=torch.bfloat16,  # bfloat16 for RTX 5090
-                device_map={"": "cuda:0"},
-                trust_remote_code=True
-            )
-            print("✓ Model loaded successfully with bfloat16")
-        else:
-            print("Loading model on CPU...")
-            self.model = AutoModelForCausalLM.from_pretrained(
-                model_path,
-                attn_implementation=attn_impl,
-                torch_dtype=torch.float32,
-                device_map="auto",
-                trust_remote_code=True
-            )
-
-        # Verify which device the model is actually on
-        model_device = next(self.model.parameters()).device
-        print(f"Model loaded on device: {model_device}")
-        if model_device.type == "cpu" and torch.cuda.is_available():
-            print("WARNING: Model is on CPU despite CUDA being available!")
-            print("Force moving model to GPU...")
-            self.model = self.model.to("cuda")
-            model_device = next(self.model.parameters()).device
-            print(f"Model now on device: {model_device}")
-
-        self.processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
+        model_path = "./weights/DotsOCR"
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_path,
+            attn_implementation="flash_attention_2",
+            torch_dtype=torch.bfloat16,
+            device_map="auto",
+            trust_remote_code=True
+        )
+        self.processor = AutoProcessor.from_pretrained(model_path,  trust_remote_code=True,use_fast=True)
         self.process_vision_info = process_vision_info
+
+        # Fix cache_position None issue in prepare_inputs_for_generation
+        # The model code gets cached by transformers, so we need to patch it at runtime
+        try:
+            import inspect
+            source = inspect.getsource(self.model.prepare_inputs_for_generation)
+
+            # Check if the fix is already applied
+            if "cache_position is None" not in source:
+                # Read the model file to get the fixed version
+                model_file = f"{model_path}/modeling_dots_ocr.py"
+                try:
+                    with open(model_file, 'r') as f:
+                        model_source = f.read()
+
+                    # Replace the method with the fixed version
+                    # Find the prepare_inputs_for_generation method and add cache_position=None check
+                    old_pattern = r'(def prepare_inputs_for_generation\([^)]*cache_position[^)]*\):)'
+                    new_code = r'''\1
+                    if cache_position is None:
+                        cache_position = torch.zeros(1, dtype=torch.long, device=input_ids.device)'''
+
+                    model_source_fixed = re.sub(old_pattern, new_code, model_source, count=1)
+
+                    # Execute the fixed method in the model's context
+                    exec_locals = {}
+                    exec(compile(model_source_fixed, model_file, 'exec'), globals(), exec_locals)
+
+                    # Get the fixed method and bind it to the model instance
+                    if 'prepare_inputs_for_generation' in exec_locals:
+                        import types
+                        fixed_method = exec_locals['prepare_inputs_for_generation']
+                        # Bind the method to the model instance
+                        self.model.prepare_inputs_for_generation = types.MethodType(fixed_method, self.model)
+                        print("✓ Applied cache_position None fix at runtime")
+                except Exception as e:
+                    print(f"Warning: Could not apply cache_position fix from file: {e}")
+                    # Apply inline fix as fallback
+                    import types
+                    original_method = self.model.prepare_inputs_for_generation
+
+                    def fixed_prepare_inputs_for_generation(self, *args, **kwargs):
+                        # Ensure cache_position is in kwargs
+                        if 'cache_position' not in kwargs or kwargs['cache_position'] is None:
+                            import torch
+                            # Create a default cache_position if input_ids is available
+                            if args and hasattr(args[0], 'device'):
+                                kwargs['cache_position'] = torch.zeros(1, dtype=torch.long, device=args[0].device)
+                            elif 'input_ids' in kwargs:
+                                kwargs['cache_position'] = torch.zeros(1, dtype=torch.long, device=kwargs['input_ids'].device)
+                        return original_method(*args, **kwargs)
+
+                    self.model.prepare_inputs_for_generation = types.MethodType(fixed_prepare_inputs_for_generation, self.model)
+                    print("✓ Applied cache_position inline fix")
+        except Exception as e:
+            print(f"Warning: Could not apply cache_position fix: {e}")
 
     def _inference_with_hf(self, image, prompt):
         messages = [
@@ -135,79 +146,34 @@ class DotsMOCRParser:
             }
         ]
 
-        try:
-            # Preparation for inference
-            text = self.processor.apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=True
-            )
+        # Preparation for inference
+        text = self.processor.apply_chat_template(
+            messages, 
+            tokenize=False, 
+            add_generation_prompt=True
+        )
+        image_inputs, video_inputs = self.process_vision_info(messages)
+        inputs = self.processor(
+            text=[text],
+            images=image_inputs,
+            videos=video_inputs,
+            padding=True,
+            return_tensors="pt",
+        )
 
-            image_inputs, video_inputs = self.process_vision_info(messages)
+        inputs = inputs.to("cuda")
 
-            inputs = self.processor(
-                text=[text],
-                images=image_inputs,
-                videos=video_inputs,
-                padding=True,
-                return_tensors="pt",
-            )
+        # Inference: Generation of the output
+        generated_ids = self.model.generate(**inputs, max_new_tokens=24000)
+        generated_ids_trimmed = [
+            out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
+        ]
+        response = self.processor.batch_decode(
+            generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
+        )[0]
+        return response
 
-            # Check for None in inputs
-            if inputs is None:
-                print("Error: Processor returned None inputs")
-                return ""
-
-            # Move inputs to the same device as the model
-            device = next(self.model.parameters()).device
-            inputs = inputs.to(device)
-
-            # Inference: Generation of the output
-            # Filter out unused kwargs for transformers 4.46+ compatibility
-            unused_kwargs = ['mm_token_type_ids']
-            filtered_inputs = {k: v for k, v in inputs.items() if k not in unused_kwargs}
-
-            print(f"Filtered inputs keys: {list(filtered_inputs.keys())}")
-            print(f"Input IDs shape: {filtered_inputs.get('input_ids', 'NOT FOUND').shape if filtered_inputs.get('input_ids') is not None else 'None'}")
-
-            generated_ids = self.model.generate(**filtered_inputs, max_new_tokens=24000)
-
-            # Handle None case
-            if generated_ids is None:
-                print("Warning: Model generation returned None")
-                return ""
-
-            print(f"Generated IDs shape: {generated_ids.shape}")
-
-            generated_ids_trimmed = [
-                out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
-            ]
-
-            print(f"Trimmed IDs count: {len(generated_ids_trimmed)}")
-
-            # Decode with error handling
-            decoded = self.processor.batch_decode(
-                generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
-            )
-
-            if decoded and len(decoded) > 0:
-                response = decoded[0]
-                print(f"Decoded response length: {len(response)}")
-                return response
-            else:
-                print("Warning: Processor returned empty decode result")
-                return ""
-
-        except Exception as e:
-            print(f"Error in _inference_with_hf: {e}")
-            import traceback
-            traceback.print_exc()
-            return ""
-
-    def _inference_with_vllm(self, image, prompt, prompt_mode):
-        system_prompt = "You are a helpful assistant."
-        if prompt_mode != "prompt_general":
-            system_prompt = None
+    def _inference_with_vllm(self, image, prompt):
         response = inference_with_vllm(
             image,
             prompt, 
@@ -218,26 +184,16 @@ class DotsMOCRParser:
             temperature=self.temperature,
             top_p=self.top_p,
             max_completion_tokens=self.max_completion_tokens,
-            system_prompt=system_prompt,
         )
         return response
 
-    def get_prompt(self, prompt_mode, bbox=None, origin_image=None, image=None, min_pixels=None, max_pixels=None, custom_prompt=None):
+    def get_prompt(self, prompt_mode, bbox=None, origin_image=None, image=None, min_pixels=None, max_pixels=None):
         prompt = dict_promptmode_to_prompt[prompt_mode]
         if prompt_mode == 'prompt_grounding_ocr':
             assert bbox is not None
             bboxes = [bbox]
             bbox = pre_process_bboxes(origin_image, bboxes, input_width=image.width, input_height=image.height, min_pixels=min_pixels, max_pixels=max_pixels)[0]
             prompt = prompt + str(bbox)
-        if prompt_mode == 'prompt_image_to_svg':#如果是svg，需要把图片大小作为viewbox传进去
-            prompt = prompt.replace("{width}", str(origin_image.width))
-            prompt = prompt.replace("{height}", str(origin_image.height))
-            print(prompt)
-        if prompt_mode == 'prompt_general':
-            if custom_prompt:
-                prompt = custom_prompt
-            else:
-                prompt = "Please describe the content of this image."
         return prompt
 
     # def post_process_results(self, response, prompt_mode, save_dir, save_name, origin_image, image, min_pixels, max_pixels)
@@ -251,8 +207,6 @@ class DotsMOCRParser:
         page_idx=0, 
         bbox=None,
         fitz_preprocess=False,
-        custom_prompt=None,
-        temperature=None,
         ):
         min_pixels, max_pixels = self.min_pixels, self.max_pixels
         if prompt_mode == "prompt_grounding_ocr":
@@ -267,73 +221,26 @@ class DotsMOCRParser:
         else:
             image = fetch_image(origin_image, min_pixels=min_pixels, max_pixels=max_pixels)
         input_height, input_width = smart_resize(image.height, image.width)
-        prompt = self.get_prompt(prompt_mode, bbox, origin_image, image, min_pixels=min_pixels, max_pixels=max_pixels, custom_prompt=custom_prompt)
-        
-        if temperature != None:
-            self.temperature = temperature
-
-        # Call inference and handle potential errors
-        try:
-            if self.use_hf:
-                response = self._inference_with_hf(image, prompt)
-            else:
-                response = self._inference_with_vllm(image, prompt, prompt_mode)
-        except Exception as e:
-            print(f"Error during inference: {e}")
-            import traceback
-            traceback.print_exc()
-            # Return error result instead of None
-            result = {
-                'page_no': page_idx,
-                "input_height": input_height,
-                "input_width": input_width,
-                "error": str(e)
-            }
-            return result
-
+        prompt = self.get_prompt(prompt_mode, bbox, origin_image, image, min_pixels=min_pixels, max_pixels=max_pixels)
+        if self.use_hf:
+            response = self._inference_with_hf(image, prompt)
+        else:
+            response = self._inference_with_vllm(image, prompt)
         result = {'page_no': page_idx,
             "input_height": input_height,
             "input_width": input_width
         }
         if source == 'pdf':
             save_name = f"{save_name}_page_{page_idx}"
-
-        # Check if response is valid
-        if not response or response == "":
-            print(f"Warning: Empty response received for prompt_mode: {prompt_mode}")
-            # Create error result with empty markdown
-            md_file_path = os.path.join(save_dir, f"{save_name}.md")
-            with open(md_file_path, "w", encoding="utf-8") as md_file:
-                md_file.write("")  # Empty markdown
-            result.update({
-                'md_content_path': md_file_path,
-                'error': 'Empty model response'
-            })
-            return result
-
-        if prompt_mode in ['prompt_layout_all_en', 'prompt_layout_only_en', 'prompt_grounding_ocr', 'prompt_web_parsing']:
-            try:
-                cells, filtered = post_process_output(
-                    response,
-                    prompt_mode,
-                    origin_image,
-                    image,
-                    min_pixels=min_pixels,
-                    max_pixels=max_pixels,
+        if prompt_mode in ['prompt_layout_all_en', 'prompt_layout_only_en', 'prompt_grounding_ocr']:
+            cells, filtered = post_process_output(
+                response, 
+                prompt_mode, 
+                origin_image, 
+                image,
+                min_pixels=min_pixels, 
+                max_pixels=max_pixels,
                 )
-            except Exception as e:
-                print(f"Error in post_process_output: {e}")
-                import traceback
-                traceback.print_exc()
-                # Create result with raw response
-                md_file_path = os.path.join(save_dir, f"{save_name}.md")
-                with open(md_file_path, "w", encoding="utf-8") as md_file:
-                    md_file.write(response)
-                result.update({
-                    'md_content_path': md_file_path,
-                    'error': f'post_process_output failed: {str(e)}'
-                })
-                return result
             if filtered and prompt_mode != 'prompt_layout_only_en':  # model output json failed, use filtered process
                 json_file_path = os.path.join(save_dir, f"{save_name}.json")
                 with open(json_file_path, 'w', encoding="utf-8") as w:
@@ -385,71 +292,6 @@ class DotsMOCRParser:
                         'md_content_path': md_file_path,
                         'md_content_nohf_path': md_nohf_file_path,
                     })
-        elif prompt_mode in ['prompt_scene_spotting']:
-            instances, failed = post_process_scene_text(response, origin_image, image, min_pixels, max_pixels)
-            
-            # 绘制可视化（失败则用原图）
-            vis_image = origin_image if failed else draw_scene_text_on_image(origin_image, instances) if instances else origin_image
-            
-            # 保存图片
-            image_layout_path = os.path.join(save_dir, f"{save_name}.jpg")
-            vis_image.save(image_layout_path)
-            
-            # 保存 JSON
-            json_file_path = os.path.join(save_dir, f"{save_name}.json")
-            with open(json_file_path, 'w', encoding="utf-8") as f:
-                json.dump(instances if not failed else {"raw": response}, f, ensure_ascii=False, indent=2)
-            
-            # 保存 Markdown
-            md_content = format_scene_text_to_markdown(instances) if not failed else response
-            md_file_path = os.path.join(save_dir, f"{save_name}.md")
-            with open(md_file_path, "w", encoding="utf-8") as f:
-                f.write(md_content)
-            
-            result.update({
-                'layout_image_path': image_layout_path,
-                'layout_info_path': json_file_path,
-                'md_content_path': md_file_path,
-                'text_instances': instances if not failed else None,
-                'filtered': failed
-            })
-
-        elif prompt_mode in ['prompt_image_to_svg']:   ##todo
-            svg_content, has_svg = extract_svg_from_response(response)
-            
-            if has_svg:
-                # 转换 SVG 为 PN,保存原图长宽比缩放
-                png_path = os.path.join(save_dir, f"{save_name}_rendered.png")
-                w, h = origin_image.size
-                tw, th = (1024, round(h * 1024 / w)) if w <= h else (round(w * 1024 / h), 1024)
-                success, error = svg_to_png(svg_content, png_path, width=w, height=h)
-                                
-                if success:
-                    # 创建对比图：上面原图，下面渲染图
-                    rendered_image = Image.open(png_path)
-                    comparison_image = create_comparison_image(origin_image, rendered_image)
-                    image_layout_path = os.path.join(save_dir, f"{save_name}.jpg")
-                    comparison_image.save(image_layout_path)
-                else:
-                    # SVG 转换失败，保存原图
-                    print(f"SVG to PNG failed: {error}")
-                    image_layout_path = os.path.join(save_dir, f"{save_name}.jpg")
-                    origin_image.save(image_layout_path)        
-            else:
-                # 没有 SVG，保存原图
-                image_layout_path = os.path.join(save_dir, f"{save_name}.jpg")
-                origin_image.save(image_layout_path)
-            
-            # Markdown 直接放原始输出
-            md_file_path = os.path.join(save_dir, f"{save_name}.md")
-            md_content = f"# Generated SVG Code\n\n```xml\n{response}\n```"
-            with open(md_file_path, "w", encoding="utf-8") as f:
-                f.write(md_content)
-            
-            result.update({
-                'layout_image_path': image_layout_path,
-                'md_content_path': md_file_path,
-            })
         else:
             image_layout_path = os.path.join(save_dir, f"{save_name}.jpg")
             origin_image.save(image_layout_path)
@@ -467,9 +309,9 @@ class DotsMOCRParser:
 
         return result
     
-    def parse_image(self, input_path, filename, prompt_mode, save_dir, bbox=None, fitz_preprocess=False, custom_prompt=None, temperature=None):
+    def parse_image(self, input_path, filename, prompt_mode, save_dir, bbox=None, fitz_preprocess=False):
         origin_image = fetch_image(input_path)
-        result = self._parse_single_image(origin_image, prompt_mode, save_dir, filename, source="image", bbox=bbox, fitz_preprocess=fitz_preprocess, custom_prompt=custom_prompt, temperature=temperature)
+        result = self._parse_single_image(origin_image, prompt_mode, save_dir, filename, source="image", bbox=bbox, fitz_preprocess=fitz_preprocess)
         result['file_path'] = input_path
         return [result]
         
@@ -489,17 +331,7 @@ class DotsMOCRParser:
         ]
 
         def _execute_task(task_args):
-            try:
-                result = self._parse_single_image(**task_args)
-                if result is None:
-                    print(f"Warning: Task returned None for {task_args}")
-                    return {"page_no": task_args.get("page_idx", 0), "error": "Processing returned None"}
-                return result
-            except Exception as e:
-                print(f"Error processing page {task_args.get('page_idx', 'unknown')}: {e}")
-                import traceback
-                traceback.print_exc()
-                return {"page_no": task_args.get("page_idx", 0), "error": str(e)}
+            return self._parse_single_image(**task_args)
 
         if self.use_hf:
             num_thread =  1
@@ -524,8 +356,7 @@ class DotsMOCRParser:
         output_dir="", 
         prompt_mode="prompt_layout_all_en",
         bbox=None,
-        fitz_preprocess=False,
-        custom_prompt=None
+        fitz_preprocess=False
         ):
         output_dir = output_dir or self.output_dir
         output_dir = os.path.abspath(output_dir)
@@ -536,7 +367,7 @@ class DotsMOCRParser:
         if file_ext == '.pdf':
             results = self.parse_pdf(input_path, filename, prompt_mode, save_dir)
         elif file_ext in image_extensions:
-            results = self.parse_image(input_path, filename, prompt_mode, save_dir, bbox=bbox, fitz_preprocess=fitz_preprocess, custom_prompt=custom_prompt)
+            results = self.parse_image(input_path, filename, prompt_mode, save_dir, bbox=bbox, fitz_preprocess=fitz_preprocess)
         else:
             raise ValueError(f"file extension {file_ext} not supported, supported extensions are {image_extensions} and pdf")
         
@@ -552,7 +383,7 @@ class DotsMOCRParser:
 def main():
     prompts = list(dict_promptmode_to_prompt.keys())
     parser = argparse.ArgumentParser(
-        description="dots.mocr Multimodal OCR: Parse Anything from Documents",
+        description="dots.ocr Multilingual Document Layout Parser",
     )
     
     parser.add_argument(
@@ -628,13 +459,9 @@ def main():
         "--use_hf", type=bool, default=False,
         help=""
     )
-    parser.add_argument(
-        "--custom_prompt", type=str, default=None,
-        help="Custom prompt for free QA mode"
-    )
     args = parser.parse_args()
 
-    dots_mocr_parser = DotsMOCRParser(
+    dots_ocr_parser = DotsOCRParser(
         protocol=args.protocol,
         ip=args.ip,
         port=args.port,
@@ -653,7 +480,7 @@ def main():
     fitz_preprocess = not args.no_fitz_preprocess
     if fitz_preprocess:
         print(f"Using fitz preprocess for image input, check the change of the image pixels")
-    result = dots_mocr_parser.parse_file(
+    result = dots_ocr_parser.parse_file(
         args.input_path, 
         prompt_mode=args.prompt,
         bbox=args.bbox,
