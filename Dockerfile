@@ -39,7 +39,7 @@ RUN pip3 install --no-deps -e .
 
 # Copy tools for model download and model code
 COPY tools/ ./tools/
-COPY dots_mocr/ ./dots_mocr/
+COPY dots_ocr/ ./dots_ocr/
 
 # Download model weights
 RUN python3 tools/download_model.py && \
