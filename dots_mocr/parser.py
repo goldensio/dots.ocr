@@ -135,52 +135,71 @@ class DotsMOCRParser:
             }
         ]
 
-        # Preparation for inference
-        text = self.processor.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=True
-        )
-        image_inputs, video_inputs = self.process_vision_info(messages)
-        inputs = self.processor(
-            text=[text],
-            images=image_inputs,
-            videos=video_inputs,
-            padding=True,
-            return_tensors="pt",
-        )
-
-        # Move inputs to the same device as the model
-        device = next(self.model.parameters()).device
-        inputs = inputs.to(device)
-
-        # Inference: Generation of the output
-        # Filter out unused kwargs for transformers 4.46+ compatibility
-        unused_kwargs = ['mm_token_type_ids']
-        filtered_inputs = {k: v for k, v in inputs.items() if k not in unused_kwargs}
-        generated_ids = self.model.generate(**filtered_inputs, max_new_tokens=24000)
-
-        # Handle None case
-        if generated_ids is None:
-            print("Warning: Model generation returned None")
-            return ""
-
-        generated_ids_trimmed = [
-            out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
-        ]
-
-        # Decode with error handling
         try:
+            # Preparation for inference
+            text = self.processor.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+
+            image_inputs, video_inputs = self.process_vision_info(messages)
+
+            inputs = self.processor(
+                text=[text],
+                images=image_inputs,
+                videos=video_inputs,
+                padding=True,
+                return_tensors="pt",
+            )
+
+            # Check for None in inputs
+            if inputs is None:
+                print("Error: Processor returned None inputs")
+                return ""
+
+            # Move inputs to the same device as the model
+            device = next(self.model.parameters()).device
+            inputs = inputs.to(device)
+
+            # Inference: Generation of the output
+            # Filter out unused kwargs for transformers 4.46+ compatibility
+            unused_kwargs = ['mm_token_type_ids']
+            filtered_inputs = {k: v for k, v in inputs.items() if k not in unused_kwargs}
+
+            print(f"Filtered inputs keys: {list(filtered_inputs.keys())}")
+            print(f"Input IDs shape: {filtered_inputs.get('input_ids', 'NOT FOUND').shape if filtered_inputs.get('input_ids') is not None else 'None'}")
+
+            generated_ids = self.model.generate(**filtered_inputs, max_new_tokens=24000)
+
+            # Handle None case
+            if generated_ids is None:
+                print("Warning: Model generation returned None")
+                return ""
+
+            print(f"Generated IDs shape: {generated_ids.shape}")
+
+            generated_ids_trimmed = [
+                out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
+            ]
+
+            print(f"Trimmed IDs count: {len(generated_ids_trimmed)}")
+
+            # Decode with error handling
             decoded = self.processor.batch_decode(
                 generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
             )
+
             if decoded and len(decoded) > 0:
-                return decoded[0]
+                response = decoded[0]
+                print(f"Decoded response length: {len(response)}")
+                return response
             else:
                 print("Warning: Processor returned empty decode result")
                 return ""
+
         except Exception as e:
-            print(f"Error decoding model output: {e}")
+            print(f"Error in _inference_with_hf: {e}")
             import traceback
             traceback.print_exc()
             return ""
