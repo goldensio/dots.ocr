@@ -155,7 +155,10 @@ class DotsMOCRParser:
         inputs = inputs.to(device)
 
         # Inference: Generation of the output
-        generated_ids = self.model.generate(**inputs, max_new_tokens=24000)
+        # Filter out unused kwargs for transformers 4.46+ compatibility
+        unused_kwargs = ['mm_token_type_ids']
+        filtered_inputs = {k: v for k, v in inputs.items() if k not in unused_kwargs}
+        generated_ids = self.model.generate(**filtered_inputs, max_new_tokens=24000)
         generated_ids_trimmed = [
             out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
         ]
