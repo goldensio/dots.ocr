@@ -64,15 +64,35 @@ class DotsMOCRParser:
         from qwen_vl_utils import process_vision_info
         import re
 
-        model_path = "./weights/DotsOCR"
+        # Use self.model_name which is set from environment variable MODEL_NAME
+        model_path = self.model_name
+        print(f"Loading model from: {model_path}")
+
+        # Try flash_attention_2, fall back to default if not available
+        try:
+            import flash_attn
+            attn_impl = "flash_attention_2"
+            print("Using flash_attention_2")
+        except ImportError:
+            attn_impl = None
+            print("flash_attn not available, using default attention")
+
+        # Build model loading arguments
+        model_kwargs = {
+            "torch_dtype": torch.bfloat16,
+            "device_map": "auto",
+            "trust_remote_code": True
+        }
+
+        # Only add attn_implementation if flash_attn is available
+        if attn_impl:
+            model_kwargs["attn_implementation"] = attn_impl
+
         self.model = AutoModelForCausalLM.from_pretrained(
             model_path,
-            attn_implementation="flash_attention_2",
-            torch_dtype=torch.bfloat16,
-            device_map="auto",
-            trust_remote_code=True
+            **model_kwargs
         )
-        self.processor = AutoProcessor.from_pretrained(model_path,  trust_remote_code=True,use_fast=True)
+        self.processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True, use_fast=True)
         self.process_vision_info = process_vision_info
 
         # Fix cache_position None issue in prepare_inputs_for_generation
