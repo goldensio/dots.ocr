@@ -1,4 +1,9 @@
-# streamlit 
+# Install pytorch, see https://pytorch.org/get-started/previous-versions/ for your cuda version
+# pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0 --index-url https://download.pytorch.org/whl/cu128
+# install flash-attn==2.8.0.post2 for faster inference
+pip install -e .
+
+# streamlit
 gradio
 gradio_image_annotation
 PyMuPDF
@@ -7,6 +12,7 @@ qwen_vl_utils
 transformers==4.56.1
 huggingface_hub
 modelscope
-# flash-attn==2.8.0.post2  # to speed up inference need flash-attn
+flash-attn==2.8.0.post2  # to speed up inference need flash-attn
 accelerate
 cairosvg
+runpod
