@@ -4,17 +4,16 @@ from tqdm import tqdm
 from multiprocessing.pool import ThreadPool, Pool
 import argparse
 
+from dots_mocr.model.inference import inference_with_vllm
+from dots_mocr.utils.consts import image_extensions, MIN_PIXELS, MAX_PIXELS
+from dots_mocr.utils.image_utils import get_image_by_fitz_doc, fetch_image, smart_resize
+from dots_mocr.utils.doc_utils import fitz_doc_to_image, load_images_from_pdf
+from dots_mocr.utils.prompts import dict_promptmode_to_prompt
+from dots_mocr.utils.layout_utils import post_process_output, draw_layout_on_image, pre_process_bboxes
+from dots_mocr.utils.format_transformer import layoutjson2md
 
-from dots_ocr.model.inference import inference_with_vllm
-from dots_ocr.utils.consts import image_extensions, MIN_PIXELS, MAX_PIXELS
-from dots_ocr.utils.image_utils import get_image_by_fitz_doc, fetch_image, smart_resize
-from dots_ocr.utils.doc_utils import fitz_doc_to_image, load_images_from_pdf
-from dots_ocr.utils.prompts import dict_promptmode_to_prompt
-from dots_ocr.utils.layout_utils import post_process_output, draw_layout_on_image, pre_process_bboxes
-from dots_ocr.utils.format_transformer import layoutjson2md
 
-
-class DotsOCRParser:
+class DotsMOCRParser:
     """
     parse image or pdf file
     """
@@ -383,7 +382,7 @@ class DotsOCRParser:
 def main():
     prompts = list(dict_promptmode_to_prompt.keys())
     parser = argparse.ArgumentParser(
-        description="dots.ocr Multilingual Document Layout Parser",
+        description="dots.mocr Multilingual Document Layout Parser",
     )
     
     parser.add_argument(
@@ -461,7 +460,7 @@ def main():
     )
     args = parser.parse_args()
 
-    dots_ocr_parser = DotsOCRParser(
+    dots_mocr_parser = DotsMOCRParser(
         protocol=args.protocol,
         ip=args.ip,
         port=args.port,
@@ -480,7 +479,7 @@ def main():
     fitz_preprocess = not args.no_fitz_preprocess
     if fitz_preprocess:
         print(f"Using fitz preprocess for image input, check the change of the image pixels")
-    result = dots_ocr_parser.parse_file(
+    result = dots_mocr_parser.parse_file(
         args.input_path, 
         prompt_mode=args.prompt,
         bbox=args.bbox,
