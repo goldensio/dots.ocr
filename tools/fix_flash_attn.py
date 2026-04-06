@@ -49,7 +49,7 @@ except ImportError:
         return False
 
 def fix_model_config(config_path):
-    """Fix torch_dtype in model config.json to use float16 instead of bfloat16."""
+    """Fix torch_dtype in model config.json - remove it to allow auto-detection."""
     try:
         with open(config_path, 'r') as f:
             config = json.load(f)
@@ -57,12 +57,13 @@ def fix_model_config(config_path):
         original_dtype = config.get("torch_dtype")
         print(f"Original torch_dtype in config: {original_dtype}")
 
-        # Change bfloat16 to float16 for better compatibility
-        if config.get("torch_dtype") == "bfloat16":
-            config["torch_dtype"] = "float16"
-            print("✓ Changed torch_dtype from bfloat16 to float16")
+        # Remove torch_dtype from config to allow auto-detection from checkpoint
+        # This prevents dtype mismatch errors
+        if "torch_dtype" in config:
+            del config["torch_dtype"]
+            print("✓ Removed torch_dtype from config (will use auto-detection)")
         else:
-            print(f"✓ torch_dtype is {config.get('torch_dtype')}, no change needed")
+            print("✓ torch_dtype not in config, no change needed")
 
         # Write the fixed config
         with open(config_path, 'w') as f:

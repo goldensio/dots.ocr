@@ -86,38 +86,27 @@ class DotsMOCRParser:
         model_path = self.model_name
         print(f"Loading model from: {model_path}")
 
-        # Load model with float16 for better CUDA compatibility
+        # Load model with auto detection, then force conversion to float16
         # The model has mixed dtypes (bfloat16 and float16), so we need to unify them
         if torch.cuda.is_available():
-            print("Loading model with float16 for CUDA compatibility...")
-            try:
-                self.model = AutoModelForCausalLM.from_pretrained(
-                    model_path,
-                    attn_implementation=attn_impl,
-                    torch_dtype=torch.float16,  # Use float16 (more CUDA kernels support it)
-                    device_map={"": "cuda:0"},
-                    trust_remote_code=True
-                )
-                print("✓ Model loaded with float16")
-                # Explicitly convert all parameters to float16 to ensure uniform dtype
-                print("Converting all model parameters to float16 to avoid dtype mismatch...")
-                self.model.to(torch.float16)
-                print("✓ All parameters converted to float16")
-            except Exception as e:
-                print(f"Failed with float16: {e}")
-                print("Retrying with bfloat16...")
-                self.model = AutoModelForCausalLM.from_pretrained(
-                    model_path,
-                    attn_implementation=attn_impl,
-                    torch_dtype=torch.bfloat16,
-                    device_map={"": "cuda:0"},
-                    trust_remote_code=True
-                )
-                print("✓ Model loaded with bfloat16")
-                # Explicitly convert all parameters to bfloat16 to ensure uniform dtype
-                print("Converting all model parameters to bfloat16 to avoid dtype mismatch...")
-                self.model.to(torch.bfloat16)
-                print("✓ All parameters converted to bfloat16")
+            print("Loading model with auto dtype detection...")
+            print("Then forcing conversion to float16 for CUDA compatibility...")
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_path,
+                attn_implementation=attn_impl,
+                torch_dtype="auto",  # Let transformers detect dtype from checkpoint
+                device_map={"": "cuda:0"},
+                trust_remote_code=True
+            )
+            print("✓ Model loaded with auto-detected dtypes")
+            # Now force ALL parameters to float16 to ensure uniform dtype
+            print("Force converting ALL model parameters to float16 to fix dtype mismatch...")
+            self.model.to(torch.float16)
+            # Also convert buffers and any other state
+            if hasattr(self.model, 'buffers'):
+                for buffer in self.model.buffers():
+                    buffer.data = buffer.data.to(torch.float16)
+            print("✓ Model fully converted to float16 (all parameters, buffers, and state)")
         else:
             print("Loading model on CPU...")
             self.model = AutoModelForCausalLM.from_pretrained(
