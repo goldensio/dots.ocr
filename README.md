@@ -8,8 +8,13 @@
 dots.ocr
 </h1>
 
-[![HuggingFace](https://img.shields.io/badge/HuggingFace%20Weights-black.svg?logo=HuggingFace)](https://huggingface.co/rednote-hilab/dots.mocr)
+[![HuggingFace](https://img.shields.io/badge/HuggingFace%20Weights-black.svg?logo=HuggingFace)](https://huggingface.co/rednote-hilab/dots.ocr)
 [![Arxiv](https://img.shields.io/badge/arXiv-Paper-B31B1B.svg?logo=arxiv)](https://arxiv.org/abs/2512.02498)
+[![Docker](https://img.shields.io/badge/Docker-Image-blue.svg?logo=Docker)](https://hub.docker.com/r/rednotehilab/dots.ocr)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.7.0+-ee4c2c.svg?logo=PyTorch)](https://pytorch.org/)
+[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg?logo=Python)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](https://github.com/rednote-hilab/dots.ocr/blob/master/LICENSE)
+[![Runpod](https://api.runpod.io/badge/goldensio/dots.ocr)](https://console.runpod.io/hub/goldensio/dots.ocr)
 
 
 <div align="center">
@@ -25,7 +30,34 @@ dots.ocr
 
 ## Introduction
 
-**dots.ocr** Designed for universal accessibility, it possesses the capability to recognize virtually any human script. Beyond achieving state-of-the-art (SOTA) performance in standard multilingual document parsing among models of comparable size, dots.ocr-1.5 excels at converting structured graphics (e.g., charts and diagrams) directly into SVG code, parsing web screens and spotting scene text. 
+**dots.ocr** Designed for universal accessibility, it possesses the capability to recognize virtually any human script. Beyond achieving state-of-the-art (SOTA) performance in standard multilingual document parsing among models of comparable size, dots.ocr-1.5 excels at converting structured graphics (e.g., charts and diagrams) directly into SVG code, parsing web screens and spotting scene text.
+
+### Model Card
+
+| Property | Value |
+|----------|-------|
+| **Model Name** | dots.ocr |
+| **Model Type** | Vision-Language Model |
+| **Parameters** | 3B |
+| **Architecture** | Qwen2-VL based |
+| **Primary Tasks** | OCR, Document Layout Analysis, Multilingual Text Recognition |
+| **Languages** | 100+ languages including English, Chinese, Arabic, Russian, Japanese, Korean |
+| **Input Types** | Image (JPG, PNG, etc.), PDF |
+| **Output Formats** | Markdown, JSON, HTML, SVG, LaTeX |
+| **License** | Apache 2.0 |
+
+<details>
+<summary><b>Quick Stats</b></summary>
+
+- 🎯 **OCRBench Score**: 86.0
+- 📊 **OmniDocBench**: 0.031 (TextEdit)
+- 🌍 **Languages**: 100+
+- ⚡ **Inference Speed**: <2s (vLLM)
+- 💾 **GPU Memory**: 8GB minimum
+- 🐳 **Docker Image**: Available
+- 🔥 **RunPod Serverless**: Ready
+
+</details> 
 
 ## News 
 * ```2026.03.19 ``` We have rebranded `dots.ocr-1.5` as [dots.mocr](https://github.com/rednote-hilab/dots.mocr). For technical details, please refer to our [paper](https://arxiv.org/abs/2603.13032v1). The model weights are available on Hugging Face: [dots.mocr](https://huggingface.co/rednote-hilab/dots.mocr) and [dots.mocr-svg](https://huggingface.co/rednote-hilab/dots.mocr-svg).
