@@ -43,12 +43,15 @@ from transformers import AutoProcessor'''
     """Dots Vision-Language Processor for OCR tasks."""
 
     def __init__(self, image_processor=None, tokenizer=None, video_processor=None, chat_template=None, **kwargs):
+        # Remove chat_template from kwargs to avoid duplicate argument error
+        kwargs.pop('chat_template', None)
+
         if HAS_QWEN2_5_VL:
             # Use Qwen2_5_VLProcessor or Qwen2VLProcessor
-            super().__init__(image_processor, tokenizer, video_processor, chat_template=chat_template)
+            super().__init__(image_processor, tokenizer, video_processor, chat_template=chat_template, **kwargs)
         else:
             # Fallback to AutoProcessor
-            AutoProcessor.__init__(self, image_processor, tokenizer, video_processor, chat_template=chat_template)
+            AutoProcessor.__init__(self, image_processor, tokenizer, video_processor, chat_template=chat_template, **kwargs)
 
         self.image_token = "<|imgpad|>" if not hasattr(tokenizer, "image_token") else tokenizer.image_token
         self.image_token_id = 151665
