@@ -103,7 +103,7 @@ class DotsMOCRParser:
                 self.model = AutoModelForCausalLM.from_pretrained(
                     model_path,
                     attn_implementation=attn_impl,
-                    dtype=torch_dtype,
+                    torch_dtype=torch_dtype,
                     device_map={"": "cuda:0"},
                     trust_remote_code=True
                 )
@@ -114,7 +114,7 @@ class DotsMOCRParser:
                 self.model = AutoModelForCausalLM.from_pretrained(
                     model_path,
                     attn_implementation=attn_impl,
-                    dtype=torch_dtype,
+                    torch_dtype=torch_dtype,
                     device_map={"": "cuda:0"},
                     trust_remote_code=True
                 )
@@ -123,7 +123,7 @@ class DotsMOCRParser:
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_path,
                 attn_implementation=attn_impl,
-                dtype=torch_dtype,
+                torch_dtype=torch_dtype,
                 device_map="auto",
                 trust_remote_code=True
             )
