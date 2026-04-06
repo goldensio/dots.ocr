@@ -99,6 +99,10 @@ class DotsMOCRParser:
                     trust_remote_code=True
                 )
                 print("✓ Model loaded with float16")
+                # Explicitly convert all parameters to float16 to ensure uniform dtype
+                print("Converting all model parameters to float16 to avoid dtype mismatch...")
+                self.model.to(torch.float16)
+                print("✓ All parameters converted to float16")
             except Exception as e:
                 print(f"Failed with float16: {e}")
                 print("Retrying with bfloat16...")
@@ -110,6 +114,10 @@ class DotsMOCRParser:
                     trust_remote_code=True
                 )
                 print("✓ Model loaded with bfloat16")
+                # Explicitly convert all parameters to bfloat16 to ensure uniform dtype
+                print("Converting all model parameters to bfloat16 to avoid dtype mismatch...")
+                self.model.to(torch.bfloat16)
+                print("✓ All parameters converted to bfloat16")
         else:
             print("Loading model on CPU...")
             self.model = AutoModelForCausalLM.from_pretrained(
