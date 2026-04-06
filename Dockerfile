@@ -28,7 +28,7 @@ RUN pip3 install --upgrade pip wheel setuptools
 COPY requirements.txt ./
 
 # Install PyTorch with CUDA 12.8
-RUN pip3 install --timeout=600 --index-url https://download.pytorch.org/whl/cu128  -r requirements.txt
+RUN pip3 install --timeout=600 --extra-index-url https://download.pytorch.org/whl/cu128 -r requirements.txt
 
 # Copy setup.py and install package
 COPY setup.py ./
