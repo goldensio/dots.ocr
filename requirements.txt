@@ -1,8 +1,9 @@
 # streamlit
 torch==2.7.0 
 torchvision==0.22.0
+runpod
 gradio
-gradio_image_annotation
+# gradio_image_annotation
 PyMuPDF
 openai
 qwen_vl_utils
@@ -12,4 +13,3 @@ modelscope
 flash-attn==2.8.0.post2  # to speed up inference need flash-attn
 accelerate
 cairosvg
-runpod
