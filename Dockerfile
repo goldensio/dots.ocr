@@ -49,6 +49,7 @@ RUN python3 tools/fix_flash_attn.py /model/modeling_dots_vision.py /model/config
 
 # Copy handler and application code
 COPY handler.py .
+COPY patch_model.py ./dots_mocr/
 
 # Create output directory
 RUN mkdir -p /app/output

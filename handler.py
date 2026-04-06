@@ -9,6 +9,9 @@ from typing import Optional
 from PIL import Image
 import runpod  # Required
 
+# CRITICAL: Patch cached model files BEFORE importing transformers
+from dots_mocr import patch_model
+
 from dots_mocr.parser import DotsMOCRParser
 from dots_mocr.utils.consts import image_extensions
 
