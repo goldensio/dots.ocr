@@ -16,7 +16,7 @@ gradio
 PyMuPDF
 openai
 qwen_vl_utils
-transformers>=4.46.0
+transformers==4.45.0
 huggingface_hub
 modelscope
 # flash-attn==2.8.0.post2  # to speed up inference need flash-attn
