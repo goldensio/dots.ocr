@@ -408,7 +408,17 @@ class DotsMOCRParser:
         ]
 
         def _execute_task(task_args):
-            return self._parse_single_image(**task_args)
+            try:
+                result = self._parse_single_image(**task_args)
+                if result is None:
+                    print(f"Warning: Task returned None for {task_args}")
+                    return {"page_no": task_args.get("page_idx", 0), "error": "Processing returned None"}
+                return result
+            except Exception as e:
+                print(f"Error processing page {task_args.get('page_idx', 'unknown')}: {e}")
+                import traceback
+                traceback.print_exc()
+                return {"page_no": task_args.get("page_idx", 0), "error": str(e)}
 
         if self.use_hf:
             num_thread =  1

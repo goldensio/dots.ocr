@@ -101,6 +101,21 @@ def handler(event):
                     tempfile.gettempdir()
                 )
 
+                if not results:
+                    os.unlink(tmp_file_path)
+                    return {
+                        "error": "OCR processing produced no results"
+                    }
+
+                # Check for errors in results
+                errors = [r for r in results if "error" in r]
+                if errors:
+                    error_msg = "; ".join([f"Page {e.get('page_no', '?')}: {e['error']}" for e in errors])
+                    os.unlink(tmp_file_path)
+                    return {
+                        "error": f"OCR processing failed for some pages: {error_msg}"
+                    }
+
                 # Combine all markdown pages
                 combined_md = ""
                 for result in sorted(results, key=lambda x: x.get("page_no", 0)):
@@ -142,24 +157,36 @@ def handler(event):
                     tempfile.gettempdir()
                 )
 
-                if results and len(results) > 0:
-                    md_path = results[0].get("md_content_path")
-                    if md_path and os.path.exists(md_path):
-                        with open(md_path, "r", encoding="utf-8") as f:
-                            markdown_content = f.read()
+                if not results or len(results) == 0:
+                    os.unlink(tmp_file_path)
+                    return {
+                        "error": "OCR processing produced no results"
+                    }
 
-                        os.unlink(tmp_file_path)
+                # Check for errors in results
+                if "error" in results[0]:
+                    os.unlink(tmp_file_path)
+                    return {
+                        "error": f"OCR processing failed: {results[0]['error']}"
+                    }
 
-                        # Return the result
-                        return {
-                            "status": "success",
-                            "filename": filename,
-                            "markdown": markdown_content
-                        }
+                md_path = results[0].get("md_content_path")
+                if md_path and os.path.exists(md_path):
+                    with open(md_path, "r", encoding="utf-8") as f:
+                        markdown_content = f.read()
+
+                    os.unlink(tmp_file_path)
+
+                    # Return the result
+                    return {
+                        "status": "success",
+                        "filename": filename,
+                        "markdown": markdown_content
+                    }
 
                 os.unlink(tmp_file_path)
                 return {
-                    "error": "OCR processing produced no results"
+                    "error": "OCR processing produced no markdown output"
                 }
 
             except Exception as e:
@@ -173,8 +200,11 @@ def handler(event):
             }
 
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
         return {
-            "error": f"OCR processing failed: {str(e)}"
+            "error": f"OCR processing failed: {str(e)}",
+            "traceback": error_details
         }
 
 
