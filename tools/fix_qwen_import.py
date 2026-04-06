@@ -84,12 +84,6 @@ AutoProcessor\.register\("dots_ocr", DotsVLProcessor\)'''
         self.video_token = "<|video_pad|>" if not hasattr(tokenizer, "video_token") else tokenizer.video_token
         self.video_token_id = 151656
 
-    # Add any missing methods from parent if needed
-    if not HAS_QWEN2_5_VL:
-        def __call__(self, *args, **kwargs):
-            """Forward to AutoProcessor's call method."""
-            return AutoProcessor.__call__(self, *args, **kwargs)
-
 AutoProcessor.register("dots_ocr", DotsVLProcessor)'''
 
         # Try regex replacement first

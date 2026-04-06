@@ -170,6 +170,12 @@ class DotsMOCRParser:
             return_tensors="pt",
         )
 
+        # Debug: Print what keys the processor returns
+        print(f"Processor input keys: {inputs.keys()}")
+        print(f"Pixel values in inputs: {'pixel_values' in inputs}")
+        print(f"Image grid thw in inputs: {'image_grid_thw' in inputs}")
+        print(f"Grid thw in inputs: {'grid_thw' in inputs}")
+
         # Move inputs to the same device as the model
         device = next(self.model.parameters()).device
         inputs = inputs.to(device)
