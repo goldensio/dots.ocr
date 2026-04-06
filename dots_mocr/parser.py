@@ -86,35 +86,27 @@ class DotsMOCRParser:
         model_path = self.model_name
         print(f"Loading model from: {model_path}")
 
-        # Determine dtype - try float16 first (more compatible than bfloat16)
+        # Load model with auto dtype detection first to avoid dtype mismatch errors
+        # The model has mixed dtypes (bfloat16 and float16), so we need to load as-is first
         if torch.cuda.is_available():
-            torch_dtype = torch.float16
-            print("Using float16 (more compatible than bfloat16)")
-        else:
-            torch_dtype = torch.float32
-            print("Using float32 (CPU mode)")
-
-        print(f"Using torch_dtype: {torch_dtype}")
-
-        # Load model with explicit device mapping and error handling
-        if torch.cuda.is_available():
-            print("Loading model with explicit CUDA device mapping...")
+            print("Loading model with auto dtype detection...")
+            print("This avoids dtype mismatch errors with mixed precision weights")
             try:
                 self.model = AutoModelForCausalLM.from_pretrained(
                     model_path,
                     attn_implementation=attn_impl,
-                    torch_dtype=torch_dtype,
+                    torch_dtype="auto",  # Auto-detect dtype from checkpoint
                     device_map={"": "cuda:0"},
                     trust_remote_code=True
                 )
+                print("✓ Model loaded with auto-detected dtypes")
             except Exception as e:
-                print(f"Failed with {torch_dtype}: {e}")
-                print("Retrying with float32...")
-                torch_dtype = torch.float32
+                print(f"Failed with auto dtype: {e}")
+                print("Retrying with float16...")
                 self.model = AutoModelForCausalLM.from_pretrained(
                     model_path,
                     attn_implementation=attn_impl,
-                    torch_dtype=torch_dtype,
+                    torch_dtype=torch.float16,
                     device_map={"": "cuda:0"},
                     trust_remote_code=True
                 )
@@ -123,7 +115,7 @@ class DotsMOCRParser:
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_path,
                 attn_implementation=attn_impl,
-                torch_dtype=torch_dtype,
+                torch_dtype="auto",
                 device_map="auto",
                 trust_remote_code=True
             )
