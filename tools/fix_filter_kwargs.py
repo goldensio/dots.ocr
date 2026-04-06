@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-Fix logits_to_keep error by removing it from forward() signature
+Fix logits_to_keep error by removing it completely from forward()
 The transformers 4.45.0 Qwen2ForCausalLM.forward() doesn't support logits_to_keep
 """
 import sys
 
 def fix_filter_kwargs(file_path):
-    """Remove logits_to_keep from forward() signature and filter from loss_kwargs"""
+    """Remove logits_to_keep from forward() signature and super() call"""
     try:
         with open(file_path, 'r') as f:
             content = f.read()
 
-        # Remove logits_to_keep from the method signature
+        # Fix 1: Remove logits_to_keep from the method signature
         old_signature = '''        logits_to_keep: int = 0,
         **loss_kwargs,'''
 
@@ -23,20 +23,36 @@ def fix_filter_kwargs(file_path):
         else:
             print("✓ Forward signature already updated or pattern not found")
 
-        # Filter logits_to_keep from loss_kwargs before processing
-        old_line1 = '''    ) -> Union[Tuple, CausalLMOutputWithPast]:
+        # Fix 2: Filter logits_to_keep from loss_kwargs before processing
+        old_return = '''    ) -> Union[Tuple, CausalLMOutputWithPast]:
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict'''
 
-        new_line1 = '''    ) -> Union[Tuple, CausalLMOutputWithPast]:
+        new_return = '''    ) -> Union[Tuple, CausalLMOutputWithPast]:
         # Filter out logits_to_keep from loss_kwargs for transformers 4.45.0 compatibility
         loss_kwargs.pop('logits_to_keep', None)
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict'''
 
-        if old_line1 in content:
-            content = content.replace(old_line1, new_line1)
+        if old_return in content:
+            content = content.replace(old_return, new_return)
             print("✓ Added logits_to_keep filtering from loss_kwargs")
         else:
             print("✓ Filtering already added or pattern not found")
+
+        # Fix 3: Remove logits_to_keep from the super().forward() call
+        old_super_call = '''            # return_dict=return_dict,
+            logits_to_keep=logits_to_keep,
+            **loss_kwargs,
+        )'''
+
+        new_super_call = '''            # return_dict=return_dict,
+            **loss_kwargs,
+        )'''
+
+        if old_super_call in content:
+            content = content.replace(old_super_call, new_super_call)
+            print("✓ Removed logits_to_keep from super().forward() call")
+        else:
+            print("✓ Super forward call already updated or pattern not found")
 
         # Write the fixed content
         with open(file_path, 'w') as f:
