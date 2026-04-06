@@ -43,9 +43,10 @@ RUN python3 tools/download_model.py && \
     mv weights/DotsMOCR /model && \
     rm -rf weights
 
-# Apply flash_attn fix, config dtype fix, and Qwen2_5_VL import fix
+# Apply flash_attn fix, config dtype fix, Qwen2_5_VL import fix, and grid_thw None fix
 RUN python3 tools/fix_flash_attn.py /model/modeling_dots_vision.py /model/config.json && \
-    python3 tools/fix_qwen_import.py /model/configuration_dots.py
+    python3 tools/fix_qwen_import.py /model/configuration_dots.py && \
+    python3 tools/fix_grid_thw.py /model/modeling_dots_ocr.py
 
 # Copy handler and application code
 COPY handler.py .
