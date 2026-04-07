@@ -30,6 +30,11 @@ COPY requirements.txt ./
 # Install PyTorch with CUDA 12.8
 RUN pip3 install --timeout=600 --extra-index-url https://download.pytorch.org/whl/cu128 -r requirements.txt
 
+# Install flash-attn for faster inference (optional, falls back if fails)
+RUN pip3 install wheel ninja packaging && \
+    pip3 install flash-attn --no-build-isolation || \
+    echo "Warning: flash-attn installation failed, will use default attention"
+
 # Copy setup.py and install package
 COPY setup.py ./
 RUN pip3 install --no-deps -e .
@@ -40,8 +45,7 @@ COPY dots_ocr/ ./dots_ocr/
 
 # Download model weights
 RUN python3 tools/download_model.py && \
-    mv weights/DotsMOCR /model && \
-    rm -rf weights
+    mv weights/DotsMOCR /model
 
 
 # Copy handler

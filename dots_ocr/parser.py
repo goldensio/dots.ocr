@@ -75,9 +75,17 @@ class DotsOCRParser:
                 # Try Docker path
                 model_path = "/model"
 
+        # Try to use flash_attention_2 if available, otherwise use default
+        try:
+            import flash_attn
+            attn_impl = "flash_attention_2"
+        except (ImportError, ModuleNotFoundError):
+            print("Warning: flash_attn not available, using default attention implementation")
+            attn_impl = None
+
         self.model = AutoModelForCausalLM.from_pretrained(
             model_path,
-            attn_implementation="flash_attention_2",
+            attn_implementation=attn_impl,
             torch_dtype=torch.bfloat16,
             device_map="auto",
             trust_remote_code=True
