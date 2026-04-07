@@ -40,7 +40,7 @@ COPY dots_ocr/ ./dots_ocr/
 
 # Download model weights
 RUN python3 tools/download_model.py && \
-    mv weights/DotsMOCR /model && \
+    mv weights/DotsMOCR weights/DotsOCR && \
     rm -rf weights
 
 # Copy handler
@@ -53,7 +53,7 @@ RUN mkdir -p /app/output
 ENV PYTHONUNBUFFERED=1
 ENV CUDA_LAUNCH_BLOCKING=0
 ENV USE_HF=true
-ENV MODEL_NAME=/model
+ENV MODEL_NAME=weights/DotsOCR
 ENV TEMPERATURE=0.1
 ENV TOP_P=1.0
 ENV MAX_COMPLETION_TOKENS=32768
