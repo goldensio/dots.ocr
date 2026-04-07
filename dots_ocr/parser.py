@@ -61,10 +61,20 @@ class DotsOCRParser:
 
     def _load_hf_model(self):
         import torch
+        import os
         from transformers import AutoModelForCausalLM, AutoProcessor, AutoTokenizer
         from qwen_vl_utils import process_vision_info
 
-        model_path = "./weights/DotsOCR"
+        # Use self.model_name if it's a local path, otherwise use default
+        if self.model_name.startswith("./") or self.model_name.startswith("/"):
+            model_path = self.model_name
+        else:
+            # Fallback to local weights directory for non-local model_name
+            model_path = "./weights/DotsMOCR"
+            if not os.path.exists(model_path):
+                # Try Docker path
+                model_path = "/model"
+
         self.model = AutoModelForCausalLM.from_pretrained(
             model_path,
             attn_implementation="flash_attention_2",
